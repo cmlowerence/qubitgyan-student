@@ -26,40 +26,49 @@ export default function LoginPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
+  
+  if (!email || !password) {
+    showAlert({ 
+      title: "Missing Information", 
+      message: "Please enter both your email and password.", 
+      variant: "warning" 
+    });
+    return;
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    const baseUrl = api.defaults.baseURL || '';
+    const loginUrl = baseUrl.replace('/v1', '/token/'); 
+    const response = await api.post(loginUrl, { 
+      username: email,
+      password 
+    });
+
+    await login(response.data.access);
+  } catch (error: any) {
+    console.error(error);
+    const status = error.response?.status;
+    let msg = "Something went wrong. Please try again.";
     
-    if (!email || !password) {
-      showAlert({ 
-        title: "Missing Information", 
-        message: "Please enter both your email and password.", 
-        variant: "warning" 
-      });
-      return;
-    }
+    if (status === 404) msg = "Login URL not found. Please contact support.";
+    else if (status === 401) msg = "Invalid email or password.";
+    else if (status === 400) msg = "Invalid credentials format.";
+    else if (status === 403) msg = "Your account may be suspended.";
+    else if (status === 500) msg = "Server error. Please try again later.";
 
-    setIsSubmitting(true);
+    showAlert({ 
+      title: "Login Failed", 
+      message: msg, 
+      variant: "error" 
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
-    try {
-      const response = await api.post('/token/', { email, password });
-      await login(response.data.access);
-    } catch (error: any) {
-      console.error(error);
-      const status = error.response?.status;
-      let msg = "Something went wrong. Please try again.";
-      
-      if (status === 401) msg = "Invalid email or password. Please check your credentials.";
-      else if (status === 403) msg = "Your account may be suspended. Please contact support.";
-      else if (status === 500) msg = "Our servers are having a moment. Please try again later.";
-
-      showAlert({ 
-        title: "Login Failed", 
-        message: msg, 
-        variant: "error" 
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <div className="bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl rounded-2xl p-8 animate-in-scale">
