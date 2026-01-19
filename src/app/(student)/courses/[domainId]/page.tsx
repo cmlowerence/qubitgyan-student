@@ -32,16 +32,26 @@ export default function SubjectSelectionPage() {
         // 2. Fetch the Subjects (Children)
         const subjectsRes = await api.get(`/nodes/?parent=${domainId}`);
         
-        // FIX: Handle Django Pagination ({ count: 5, results: [...] })
-        let subjectList = [];
+        // Unwrap the Django pagination result
+        let rawList: KnowledgeNode[] = [];
         if (subjectsRes.data.results && Array.isArray(subjectsRes.data.results)) {
-          subjectList = subjectsRes.data.results;
+          rawList = subjectsRes.data.results;
         } else if (Array.isArray(subjectsRes.data)) {
-          subjectList = subjectsRes.data;
+          rawList = subjectsRes.data;
         }
 
-        console.log("Subjects Found:", subjectList); // Debug Log
-        setSubjects(subjectList);
+        // --- CRITICAL FIX: STRICT FILTERING ---
+        // We ensure that we ONLY show nodes that are children of the current ID.
+        // This fixes the issue where the API might return "Root Domains" by mistake.
+        const filteredSubjects = rawList.filter(node => node.parent === Number(domainId));
+
+        // Sort by order just to be safe
+        filteredSubjects.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        console.log("Raw API Response:", rawList);
+        console.log("Filtered Subjects:", filteredSubjects);
+        
+        setSubjects(filteredSubjects);
         
       } catch (error) {
         console.error("Failed to fetch subjects", error);
@@ -109,7 +119,7 @@ export default function SubjectSelectionPage() {
             className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Domains
+            Back to Dashboard
           </button>
         </div>
       </div>
@@ -127,7 +137,7 @@ export default function SubjectSelectionPage() {
             </div>
             <h3 className="text-lg font-semibold text-slate-900">No Subjects Found</h3>
             <p className="text-slate-500 max-w-sm mx-auto mt-1">
-              There are no subjects listed under {domain.name} yet.
+              We found 0 items that are children of "{domain.name}".
             </p>
           </div>
         )}
@@ -157,7 +167,7 @@ function SubjectItem({ node, index, domainId }: { node: KnowledgeNode, index: nu
         <p className="text-sm text-slate-500 flex items-center gap-4 mt-0.5">
           <span className="flex items-center gap-1">
             <Sparkles className="w-3 h-3" />
-            Start Learning
+            {node.items_count ? `${node.items_count} Topics` : 'Start Learning'}
           </span>
         </p>
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { KnowledgeNode, Resource } from '@/types';
@@ -14,6 +14,9 @@ export default function LearningPage() {
   const params = useParams();
   const router = useRouter();
   const { showAlert } = useUi();
+  
+  // URL params
+  const domainId = params.domainId;
   const subjectId = params.subjectId;
 
   // State
@@ -25,32 +28,25 @@ export default function LearningPage() {
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [mobileView, setMobileView] = useState<'menu' | 'content'>('menu');
 
-  // 1. LOAD TREE
+  // --- 1. INITIAL LOAD ---
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch Subject details
         const subjectRes = await api.get(`/nodes/${subjectId}/`);
         setSubject(subjectRes.data);
 
-        // Fetch Children (Topics)
+        // Fetch just the first level of children (Topics)
         const treeRes = await api.get(`/nodes/?parent=${subjectId}`);
         
         let nodesData: KnowledgeNode[] = [];
-        // Handle Django Pagination 'results' wrapper
         if (treeRes.data.results && Array.isArray(treeRes.data.results)) {
           nodesData = treeRes.data.results;
         } else if (Array.isArray(treeRes.data)) {
           nodesData = treeRes.data;
         }
+        
+        // Initial Sort
         nodesData.sort((a, b) => (a.order || 0) - (b.order || 0));
-
-        nodesData.forEach(node => {
-          if (node.children) {
-            node.children.sort((a, b) => (a.order || 0) - (b.order || 0));
-          }
-        });
-        console.log("Tree Data Loaded:", nodesData); // Debug log
         setTreeNodes(nodesData);
 
       } catch (error) {
@@ -63,18 +59,56 @@ export default function LearningPage() {
     if (subjectId) fetchData();
   }, [subjectId]);
 
+  // --- 2. LAZY LOAD CHILDREN (The Fix) ---
+  const handleLoadChildren = useCallback(async (parentNode: KnowledgeNode) => {
+    // If we already have children, don't re-fetch
+    if (parentNode.children && parentNode.children.length > 0) return;
+
+    try {
+      console.log(`Fetching children for node: ${parentNode.name} (${parentNode.id})`);
+      const res = await api.get(`/nodes/?parent=${parentNode.id}`);
+      
+      let newChildren: KnowledgeNode[] = [];
+      if (res.data.results && Array.isArray(res.data.results)) {
+        newChildren = res.data.results;
+      } else if (Array.isArray(res.data)) {
+        newChildren = res.data;
+      }
+
+      // Sort children
+      newChildren.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+      // Recursive helper to update the tree state
+      const updateTreeRecursively = (nodes: KnowledgeNode[]): KnowledgeNode[] => {
+        return nodes.map(node => {
+          if (node.id === parentNode.id) {
+            return { ...node, children: newChildren };
+          }
+          if (node.children) {
+            return { ...node, children: updateTreeRecursively(node.children) };
+          }
+          return node;
+        });
+      };
+
+      setTreeNodes(prev => updateTreeRecursively(prev));
+
+    } catch (error) {
+      console.error("Error lazy loading children", error);
+      throw error; // Let the sidebar catch it
+    }
+  }, []);
+
+  // --- 3. FETCH RESOURCE (When Leaf Selected) ---
   useEffect(() => {
     const fetchResource = async () => {
       if (!activeNode) return;
 
-      // Optimistic Reset
       setIsContentLoading(true);
       setActiveResource(null); 
 
       try {
-        // Fetch resources for this specific node
         const response = await api.get(`/resources/?node=${activeNode.id}`);
-        
         let resourcesList: Resource[] = [];
         if (response.data.results && Array.isArray(response.data.results)) {
           resourcesList = response.data.results;
@@ -82,16 +116,12 @@ export default function LearningPage() {
           resourcesList = response.data;
         }
 
-        console.log(`Resources for node ${activeNode.id}:`, resourcesList);
-
         if (resourcesList.length > 0) {
-          // Sort by 'order' if available, otherwise take first
           const sorted = resourcesList.sort((a, b) => (a.order || 0) - (b.order || 0));
           setActiveResource(sorted[0]);
         } else {
           setActiveResource(null);
         }
-
       } catch (error) {
         console.error("Failed to fetch resource", error);
       } finally {
@@ -102,15 +132,14 @@ export default function LearningPage() {
     fetchResource();
   }, [activeNode]);
 
-  // Handlers
+  // --- HANDLERS ---
   const handleNodeSelect = (node: KnowledgeNode) => {
-    console.log("Selected Node:", node);
     setActiveNode(node);
     setMobileView('content');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Render Loading
+  // --- RENDER ---
   if (isTreeLoading) {
     return (
       <div className="flex h-[80vh] items-center justify-center flex-col gap-4">
@@ -140,9 +169,9 @@ export default function LearningPage() {
               {subject.name}
             </h1>
             {activeNode && (
-              <p className="text-xs text-blue-600 font-medium md:hidden">
-                Current: {activeNode.name}
-              </p>
+                <p className="text-xs text-blue-600 font-medium md:hidden">
+                    Current: {activeNode.name}
+                </p>
             )}
           </div>
         </div>
@@ -158,7 +187,6 @@ export default function LearningPage() {
         </button>
       </header>
 
-      {/* SPLIT LAYOUT */}
       <div className="flex-1 flex overflow-hidden relative bg-slate-50">
         
         {/* SIDEBAR TREE */}
@@ -176,7 +204,8 @@ export default function LearningPage() {
             <SidebarTree 
               nodes={treeNodes} 
               activeNodeId={activeNode?.id} 
-              onSelect={handleNodeSelect} 
+              onSelect={handleNodeSelect}
+              onLoadChildren={handleLoadChildren} // PASSING THE FIX
             />
             {treeNodes.length === 0 && (
               <div className="text-center py-10 px-4">
