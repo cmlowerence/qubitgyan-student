@@ -16,12 +16,28 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchDomains = async () => {
       try {
-        // Fetch the full tree. The top level items are DOMAINS.
+        // We add a filter to try and get only roots from the server if supported
+        // But we will also filter client-side to be safe.
         const { data } = await api.get('/nodes/');
         
-        // Filter just in case, though the tree root should be domains
-        // Ensure we only show top-level nodes here
-        const rootNodes = Array.isArray(data) ? data : []; 
+        let allNodes: KnowledgeNode[] = [];
+
+        // 1. Handle DRF Pagination (The likely culprit)
+        if (data.results && Array.isArray(data.results)) {
+          allNodes = data.results;
+        } else if (Array.isArray(data)) {
+          allNodes = data;
+        }
+
+        // 2. Filter for DOMAINS (Nodes with no parent)
+        // Adjust this logic if your backend treats 'parent' differently (e.g. 0 instead of null)
+        const rootNodes = allNodes.filter(node => 
+          node.parent === null || node.node_type === 'DOMAIN'
+        );
+
+        console.log("Raw Data:", data); // Debug log in browser console
+        console.log("Filtered Domains:", rootNodes);
+
         setDomains(rootNodes);
       } catch (error) {
         console.error("Failed to fetch domains", error);
@@ -33,7 +49,7 @@ export default function DashboardPage() {
     fetchDomains();
   }, []);
 
-  // --- 1. SKELETON LOADING STATE (For smooth UX) ---
+  // --- SKELETON LOADING ---
   if (isLoading) {
     return (
       <div className="space-y-8">
@@ -50,9 +66,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 pb-10">
       
-      {/* --- 2. HERO / WELCOME SECTION --- */}
+      {/* --- HERO SECTION --- */}
       <section className="relative overflow-hidden bg-gradient-to-r from-slate-900 to-slate-800 rounded-3xl p-8 md:p-12 shadow-2xl text-white">
-        {/* Decorative Background Circles */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-500/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
 
@@ -67,21 +82,13 @@ export default function DashboardPage() {
           </h1>
           
           <p className="text-slate-300 text-lg leading-relaxed mb-8">
-            Your journey to mastery continues. Select a domain below to access your learning materials and track your progress.
+            Your journey to mastery continues. Select a domain below to access your learning materials.
           </p>
-
-          {/* Stat Cards (Hardcoded for now, can be dynamic later) */}
-          <div className="flex gap-6">
-            <div className="px-4 py-2 rounded-lg bg-white/10 border border-white/5 backdrop-blur-sm">
-              <span className="block text-2xl font-bold">{domains.length}</span>
-              <span className="text-xs text-slate-400 uppercase tracking-wider">Active Domains</span>
-            </div>
-          </div>
         </div>
       </section>
 
 
-      {/* --- 3. DOMAIN GRID --- */}
+      {/* --- DOMAIN GRID --- */}
       <section>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -104,7 +111,7 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-lg font-semibold text-slate-900">No Domains Found</h3>
             <p className="text-slate-500 max-w-xs mx-auto mt-2">
-              It looks like no courses have been published yet. Please check back later.
+              We couldn't find any courses. If you are an admin, please ensure you have created "Domain" level nodes.
             </p>
           </div>
         )}
@@ -113,10 +120,8 @@ export default function DashboardPage() {
   );
 }
 
-// --- SUB-COMPONENT: DOMAIN CARD ---
-// I've included this here so you don't need to create a separate file yet.
+// --- DOMAIN CARD COMPONENT ---
 function DomainCard({ node, index }: { node: KnowledgeNode, index: number }) {
-  // We use the index to stagger animations
   const animationDelay = `${index * 100}ms`;
 
   return (
@@ -125,7 +130,6 @@ function DomainCard({ node, index }: { node: KnowledgeNode, index: number }) {
       className="group relative bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-blue-500/30 transition-all duration-300 hover:-translate-y-1 animate-fade-in block h-full flex flex-col"
       style={{ animationDelay }}
     >
-      {/* 1. Image / Thumbnail Area */}
       <div className="h-48 bg-slate-100 relative overflow-hidden">
         {node.thumbnail_url ? (
           <img 
@@ -134,10 +138,8 @@ function DomainCard({ node, index }: { node: KnowledgeNode, index: number }) {
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
-          // Fallback Gradient if no image
           <div className={cn(
             "w-full h-full bg-gradient-to-br flex items-center justify-center",
-            // Give different colors based on ID so they don't look identical
             node.id % 3 === 0 ? "from-blue-100 to-indigo-100 text-blue-500" :
             node.id % 3 === 1 ? "from-emerald-100 to-teal-100 text-emerald-500" :
             "from-amber-100 to-orange-100 text-amber-500"
@@ -145,8 +147,6 @@ function DomainCard({ node, index }: { node: KnowledgeNode, index: number }) {
             <Layers className="w-16 h-16 opacity-50" />
           </div>
         )}
-        
-        {/* Overlay Badge */}
         <div className="absolute top-4 left-4">
           <span className="px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-xs font-bold text-slate-900 shadow-sm">
             DOMAIN
@@ -154,17 +154,13 @@ function DomainCard({ node, index }: { node: KnowledgeNode, index: number }) {
         </div>
       </div>
 
-      {/* 2. Content Area */}
       <div className="p-6 flex-1 flex flex-col">
         <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
           {node.name}
         </h3>
-        
         <p className="text-sm text-slate-500 line-clamp-2 mb-6 flex-1">
-          Master the fundamentals of {node.name}. Click to explore subjects and topics.
+          Master the fundamentals of {node.name}. Click to explore.
         </p>
-
-        {/* 3. Action Footer */}
         <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
             Explore
