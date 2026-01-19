@@ -15,7 +15,6 @@ export default function LearningPage() {
   const router = useRouter();
   const { showAlert } = useUi();
   
-  const domainId = params.domainId;
   const subjectId = params.subjectId;
 
   // State
@@ -27,13 +26,15 @@ export default function LearningPage() {
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [mobileView, setMobileView] = useState<'menu' | 'content'>('menu');
 
-  // 1. INITIAL LOAD
+  // 1. INITIAL LOAD (Subject + Direct Children)
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Fetch Subject Metadata
         const subjectRes = await api.get(`/nodes/${subjectId}/`);
         setSubject(subjectRes.data);
 
+        // Fetch Level 1 Children (e.g. Topics inside Subject)
         const treeRes = await api.get(`/nodes/?parent=${subjectId}`);
         
         let nodesData: KnowledgeNode[] = [];
@@ -43,24 +44,13 @@ export default function LearningPage() {
           nodesData = treeRes.data;
         }
         
-        // --- FIX 1: Prevent "Science inside Science" ---
-        // Filter out the node we are currently viewing
-        let safeNodes = nodesData.filter(n => n.id !== Number(subjectId));
-
-        // --- FIX 2: Strict Parent Check (Optional) ---
-        // We try to filter by parent. If that results in 0 items, 
-        // we assume the data is structure differently (Root nodes) and show everything.
-        const strictChildren = safeNodes.filter(n => n.parent === Number(subjectId));
+        // FILTER: Remove the Subject itself if API returns it
+        nodesData = nodesData.filter(n => n.id !== Number(subjectId));
         
-        if (strictChildren.length > 0) {
-          safeNodes = strictChildren;
-        } else {
-          console.warn("No strict children found. Showing all returned nodes (likely siblings).");
-        }
-
-        safeNodes.sort((a, b) => (a.order || 0) - (b.order || 0));
-        setTreeNodes(safeNodes);
-
+        // SORT
+        nodesData.sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+        setTreeNodes(nodesData);
       } catch (error) {
         console.error("Failed to load course data", error);
       } finally {
@@ -71,12 +61,15 @@ export default function LearningPage() {
     if (subjectId) fetchData();
   }, [subjectId]);
 
-  // 2. LAZY LOAD CHILDREN (The Sidebar Logic)
+  // 2. LAZY LOAD (Recursively fetch deeper levels)
   const handleLoadChildren = useCallback(async (parentNode: KnowledgeNode) => {
+    // Safety check: if children exist, don't fetch again
     if (parentNode.children && parentNode.children.length > 0) return;
 
     try {
-      console.log(`Fetching children for: ${parentNode.name}`);
+      console.log(`Lazy loading children for: ${parentNode.name} (${parentNode.id})`);
+      
+      // Request children of this specific parent
       const res = await api.get(`/nodes/?parent=${parentNode.id}`);
       
       let newChildren: KnowledgeNode[] = [];
@@ -86,19 +79,21 @@ export default function LearningPage() {
         newChildren = res.data;
       }
 
-      // --- FIX 1: Recursion Guard ---
-      // Ensure we don't insert the parent inside itself
+      // CRITICAL FIX: Filter out the parent itself to prevent infinite loops
       newChildren = newChildren.filter(child => child.id !== parentNode.id);
-
+      
+      // Sort
       newChildren.sort((a, b) => (a.order || 0) - (b.order || 0));
 
+      // Recursive State Update
+      // We must walk the current tree, find the 'parentNode', and attach 'newChildren'
       const updateTreeRecursively = (nodes: KnowledgeNode[]): KnowledgeNode[] => {
         return nodes.map(node => {
           if (node.id === parentNode.id) {
-            return { ...node, children: newChildren };
+            return { ...node, children: newChildren }; // Attach here!
           }
           if (node.children) {
-            return { ...node, children: updateTreeRecursively(node.children) };
+            return { ...node, children: updateTreeRecursively(node.children) }; // Keep digging
           }
           return node;
         });
@@ -112,7 +107,7 @@ export default function LearningPage() {
     }
   }, []);
 
-  // 3. FETCH RESOURCE
+  // 3. FETCH CONTENT (When a node is selected)
   useEffect(() => {
     const fetchResource = async () => {
       if (!activeNode) return;
@@ -145,7 +140,7 @@ export default function LearningPage() {
     fetchResource();
   }, [activeNode]);
 
-  // Handlers
+  // --- RENDER ---
   const handleNodeSelect = (node: KnowledgeNode) => {
     setActiveNode(node);
     setMobileView('content');
@@ -156,7 +151,7 @@ export default function LearningPage() {
     return (
       <div className="flex h-[80vh] items-center justify-center flex-col gap-4">
         <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-        <p className="text-slate-500 animate-pulse">Loading structure...</p>
+        <p className="text-slate-500 animate-pulse">Loading course...</p>
       </div>
     );
   }
@@ -165,53 +160,34 @@ export default function LearningPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] -m-4 md:-m-8">
-      
       {/* HEADER */}
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => router.back()}
-            className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
-          >
+          <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          
           <div>
-            <h1 className="text-lg font-bold text-slate-900 leading-tight">
-              {subject.name}
-            </h1>
-            {activeNode && (
-                <p className="text-xs text-blue-600 font-medium md:hidden">
-                    Current: {activeNode.name}
-                </p>
-            )}
+            <h1 className="text-lg font-bold text-slate-900 leading-tight">{subject.name}</h1>
+            {activeNode && <p className="text-xs text-blue-600 font-medium md:hidden">{activeNode.name}</p>}
           </div>
         </div>
-
         <button
           onClick={() => setMobileView('menu')}
-          className={cn(
-            "md:hidden p-2 bg-slate-100 rounded-lg text-slate-700 text-sm font-semibold",
-            mobileView === 'menu' ? "hidden" : "block"
-          )}
+          className={cn("md:hidden p-2 bg-slate-100 rounded-lg text-sm font-bold", mobileView === 'menu' ? "hidden" : "block")}
         >
           Menu
         </button>
       </header>
 
       <div className="flex-1 flex overflow-hidden relative bg-slate-50">
-        
         {/* SIDEBAR TREE */}
         <aside className={cn(
           "w-full md:w-80 bg-white border-r border-slate-200 flex flex-col absolute md:relative inset-0 z-10 transition-transform duration-300 md:translate-x-0",
           mobileView === 'content' ? "-translate-x-full md:translate-x-0" : "translate-x-0"
         )}>
           <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Course Structure
-            </h2>
+            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Course Content</h2>
           </div>
-          
           <div className="flex-1 overflow-y-auto p-2">
             <SidebarTree 
               nodes={treeNodes} 
@@ -220,9 +196,9 @@ export default function LearningPage() {
               onLoadChildren={handleLoadChildren}
             />
             {treeNodes.length === 0 && (
-              <div className="text-center py-10 px-4">
-                <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">No items found.</p>
+              <div className="text-center py-10 px-4 text-slate-400">
+                <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No topics found.</p>
               </div>
             )}
           </div>
@@ -238,7 +214,7 @@ export default function LearningPage() {
               {isContentLoading ? (
                 <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                   <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                  <p className="text-sm">Loading content...</p>
+                  <p className="text-sm">Loading...</p>
                 </div>
               ) : (
                 <ContentViewer 
@@ -253,7 +229,7 @@ export default function LearningPage() {
               <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center">
                 <Menu className="w-8 h-8 text-slate-400" />
               </div>
-              <p>Select a topic to start.</p>
+              <p>Select a topic to start learning.</p>
             </div>
           )}
         </main>
