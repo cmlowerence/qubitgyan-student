@@ -15,7 +15,6 @@ export default function LearningPage() {
   const router = useRouter();
   const { showAlert } = useUi();
   
-  // URL params
   const domainId = params.domainId;
   const subjectId = params.subjectId;
 
@@ -28,14 +27,13 @@ export default function LearningPage() {
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [mobileView, setMobileView] = useState<'menu' | 'content'>('menu');
 
-  // --- 1. INITIAL LOAD ---
+  // 1. INITIAL LOAD
   useEffect(() => {
     const fetchData = async () => {
       try {
         const subjectRes = await api.get(`/nodes/${subjectId}/`);
         setSubject(subjectRes.data);
 
-        // Fetch just the first level of children (Topics)
         const treeRes = await api.get(`/nodes/?parent=${subjectId}`);
         
         let nodesData: KnowledgeNode[] = [];
@@ -45,9 +43,23 @@ export default function LearningPage() {
           nodesData = treeRes.data;
         }
         
-        // Initial Sort
-        nodesData.sort((a, b) => (a.order || 0) - (b.order || 0));
-        setTreeNodes(nodesData);
+        // --- FIX 1: Prevent "Science inside Science" ---
+        // Filter out the node we are currently viewing
+        let safeNodes = nodesData.filter(n => n.id !== Number(subjectId));
+
+        // --- FIX 2: Strict Parent Check (Optional) ---
+        // We try to filter by parent. If that results in 0 items, 
+        // we assume the data is structure differently (Root nodes) and show everything.
+        const strictChildren = safeNodes.filter(n => n.parent === Number(subjectId));
+        
+        if (strictChildren.length > 0) {
+          safeNodes = strictChildren;
+        } else {
+          console.warn("No strict children found. Showing all returned nodes (likely siblings).");
+        }
+
+        safeNodes.sort((a, b) => (a.order || 0) - (b.order || 0));
+        setTreeNodes(safeNodes);
 
       } catch (error) {
         console.error("Failed to load course data", error);
@@ -59,13 +71,12 @@ export default function LearningPage() {
     if (subjectId) fetchData();
   }, [subjectId]);
 
-  // --- 2. LAZY LOAD CHILDREN (The Fix) ---
+  // 2. LAZY LOAD CHILDREN (The Sidebar Logic)
   const handleLoadChildren = useCallback(async (parentNode: KnowledgeNode) => {
-    // If we already have children, don't re-fetch
     if (parentNode.children && parentNode.children.length > 0) return;
 
     try {
-      console.log(`Fetching children for node: ${parentNode.name} (${parentNode.id})`);
+      console.log(`Fetching children for: ${parentNode.name}`);
       const res = await api.get(`/nodes/?parent=${parentNode.id}`);
       
       let newChildren: KnowledgeNode[] = [];
@@ -75,10 +86,12 @@ export default function LearningPage() {
         newChildren = res.data;
       }
 
-      // Sort children
+      // --- FIX 1: Recursion Guard ---
+      // Ensure we don't insert the parent inside itself
+      newChildren = newChildren.filter(child => child.id !== parentNode.id);
+
       newChildren.sort((a, b) => (a.order || 0) - (b.order || 0));
 
-      // Recursive helper to update the tree state
       const updateTreeRecursively = (nodes: KnowledgeNode[]): KnowledgeNode[] => {
         return nodes.map(node => {
           if (node.id === parentNode.id) {
@@ -94,12 +107,12 @@ export default function LearningPage() {
       setTreeNodes(prev => updateTreeRecursively(prev));
 
     } catch (error) {
-      console.error("Error lazy loading children", error);
-      throw error; // Let the sidebar catch it
+      console.error("Error lazy loading", error);
+      throw error;
     }
   }, []);
 
-  // --- 3. FETCH RESOURCE (When Leaf Selected) ---
+  // 3. FETCH RESOURCE
   useEffect(() => {
     const fetchResource = async () => {
       if (!activeNode) return;
@@ -132,19 +145,18 @@ export default function LearningPage() {
     fetchResource();
   }, [activeNode]);
 
-  // --- HANDLERS ---
+  // Handlers
   const handleNodeSelect = (node: KnowledgeNode) => {
     setActiveNode(node);
     setMobileView('content');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // --- RENDER ---
   if (isTreeLoading) {
     return (
       <div className="flex h-[80vh] items-center justify-center flex-col gap-4">
         <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-        <p className="text-slate-500 animate-pulse">Loading course material...</p>
+        <p className="text-slate-500 animate-pulse">Loading structure...</p>
       </div>
     );
   }
@@ -205,12 +217,12 @@ export default function LearningPage() {
               nodes={treeNodes} 
               activeNodeId={activeNode?.id} 
               onSelect={handleNodeSelect}
-              onLoadChildren={handleLoadChildren} // PASSING THE FIX
+              onLoadChildren={handleLoadChildren}
             />
             {treeNodes.length === 0 && (
               <div className="text-center py-10 px-4">
                 <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">No topics found.</p>
+                <p className="text-sm text-slate-500">No items found.</p>
               </div>
             )}
           </div>
