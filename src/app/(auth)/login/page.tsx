@@ -5,70 +5,73 @@ import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/context/auth-context';
 import { useUi } from '@/components/providers/ui-provider';
 import api from '@/lib/api';
-import { Loader2, Mail, Lock, ArrowRight, UserPlus } from 'lucide-react';
+import { Loader2, User, Lock, ArrowRight, UserPlus } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
   const { showAlert } = useUi();
   
-  const [email, setEmail] = useState('');
+  // CHANGED: We now track 'username' instead of 'email'
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- NEW: Handle the Sign Up Click ---
   const handleSignUpClick = () => {
     showAlert({
       title: "Enrollment Required",
-      message: "Access to Qubitgyan is currently by invitation only. Please contact the administration office to request your enrollment credentials. We look forward to having you! Happy Learning.",
+      message: "Access to Qubitgyan is currently by invitation only. Please contact the administration office to request your enrollment credentials.",
       variant: "info",
       confirmText: "Got it"
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  if (!email || !password) {
-    showAlert({ 
-      title: "Missing Information", 
-      message: "Please enter both your email and password.", 
-      variant: "warning" 
-    });
-    return;
-  }
-
-  setIsSubmitting(true);
-
-  try {
-    const baseUrl = api.defaults.baseURL || '';
-    const loginUrl = baseUrl.replace('/v1', '/token/'); 
-    const response = await api.post(loginUrl, { 
-      username: email,
-      password 
-    });
-
-    await login(response.data.access);
-  } catch (error: any) {
-    console.error(error);
-    const status = error.response?.status;
-    let msg = "Something went wrong. Please try again.";
+    e.preventDefault();
     
-    if (status === 404) msg = "Login URL not found. Please contact support.";
-    else if (status === 401) msg = "Invalid email or password.";
-    else if (status === 400) msg = "Invalid credentials format.";
-    else if (status === 403) msg = "Your account may be suspended.";
-    else if (status === 500) msg = "Server error. Please try again later.";
+    if (!username || !password) {
+      showAlert({ 
+        title: "Missing Information", 
+        message: "Please enter both your username and password.", 
+        variant: "warning" 
+      });
+      return;
+    }
 
-    showAlert({ 
-      title: "Login Failed", 
-      message: msg, 
-      variant: "error" 
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+    setIsSubmitting(true);
 
+    try {
+      // 1. URL FIX: Step out of '/v1' to reach '/token/'
+      // Backend is at /api/token/, but Frontend defaults to /api/v1/
+      const baseUrl = api.defaults.baseURL || '';
+      const loginUrl = baseUrl.replace('/v1', '/token/');
+
+      // 2. PAYLOAD FIX: Send 'username' exactly as Django expects
+      const response = await api.post(loginUrl, { 
+        username, 
+        password 
+      });
+
+      await login(response.data.access);
+      
+    } catch (error: any) {
+      console.error(error);
+      const status = error.response?.status;
+      let msg = "Something went wrong. Please try again.";
+      
+      if (status === 404) msg = "Login endpoint not found. Contact Admin.";
+      else if (status === 401) msg = "Invalid username or password.";
+      else if (status === 400) msg = "Invalid credentials format.";
+      else if (status === 403) msg = "Your account is suspended.";
+
+      showAlert({ 
+        title: "Login Failed", 
+        message: msg, 
+        variant: "error" 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl rounded-2xl p-8 animate-in-scale">
@@ -82,19 +85,21 @@ export default function LoginPage() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
         
-        {/* Email Field */}
+        {/* Username Field (CHANGED) */}
         <div className="space-y-1">
           <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">
-            Email Address
+            Username
           </label>
           <div className="relative group">
-            <Mail className="absolute left-3 top-3 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <User className="absolute left-3 top-3 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-              placeholder="student@qubitgyan.com"
+              placeholder="Enter your username"
+              autoCapitalize="none"
+              autoCorrect="off"
             />
           </div>
         </div>
@@ -137,7 +142,7 @@ export default function LoginPage() {
         </button>
       </form>
 
-      {/* Footer - NOW INTERACTIVE */}
+      {/* Footer */}
       <div className="mt-8 pt-6 border-t border-slate-100 text-center">
         <button 
           onClick={handleSignUpClick}
