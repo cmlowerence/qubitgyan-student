@@ -9,11 +9,8 @@ import {
   ArrowLeft, 
   ChevronRight, 
   Book, 
-  Clock, 
-  Sparkles,
-  MoreVertical
+  Sparkles
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
 export default function SubjectSelectionPage() {
@@ -33,10 +30,18 @@ export default function SubjectSelectionPage() {
         setDomain(domainRes.data);
 
         // 2. Fetch the Subjects (Children)
-        // We assume your API supports filtering by parent: ?parent=ID
-        // If your API returns the whole tree in one go, we would filter logic differently.
         const subjectsRes = await api.get(`/nodes/?parent=${domainId}`);
-        setSubjects(subjectsRes.data);
+        
+        // FIX: Handle Django Pagination ({ count: 5, results: [...] })
+        let subjectList = [];
+        if (subjectsRes.data.results && Array.isArray(subjectsRes.data.results)) {
+          subjectList = subjectsRes.data.results;
+        } else if (Array.isArray(subjectsRes.data)) {
+          subjectList = subjectsRes.data;
+        }
+
+        console.log("Subjects Found:", subjectList); // Debug Log
+        setSubjects(subjectList);
         
       } catch (error) {
         console.error("Failed to fetch subjects", error);
@@ -59,7 +64,7 @@ export default function SubjectSelectionPage() {
     );
   }
 
-  // --- ERROR STATE (If domain not found) ---
+  // --- ERROR STATE ---
   if (!domain) {
     return (
       <div className="text-center py-20">
@@ -77,9 +82,8 @@ export default function SubjectSelectionPage() {
   return (
     <div className="space-y-8 pb-10">
       
-      {/* --- 1. BREADCRUMBS & HEADER --- */}
+      {/* --- BREADCRUMBS & HEADER --- */}
       <div className="space-y-4">
-        {/* Breadcrumb */}
         <nav className="flex items-center text-sm text-slate-500 animate-fade-in">
           <Link href="/dashboard" className="hover:text-blue-600 transition-colors">
             Dashboard
@@ -90,7 +94,6 @@ export default function SubjectSelectionPage() {
           </span>
         </nav>
 
-        {/* Header Title */}
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
@@ -111,7 +114,7 @@ export default function SubjectSelectionPage() {
         </div>
       </div>
 
-      {/* --- 2. SUBJECTS LIST --- */}
+      {/* --- SUBJECTS LIST --- */}
       <div className="grid grid-cols-1 gap-4">
         {subjects.length > 0 ? (
           subjects.map((subject, index) => (
@@ -119,7 +122,13 @@ export default function SubjectSelectionPage() {
           ))
         ) : (
           <div className="bg-slate-50 rounded-xl p-12 text-center border border-dashed border-slate-300">
-            <p className="text-slate-500">No subjects have been added to this domain yet.</p>
+            <div className="bg-slate-200 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Book className="w-6 h-6 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900">No Subjects Found</h3>
+            <p className="text-slate-500 max-w-sm mx-auto mt-1">
+              There are no subjects listed under {domain.name} yet.
+            </p>
           </div>
         )}
       </div>
@@ -127,24 +136,20 @@ export default function SubjectSelectionPage() {
   );
 }
 
-// --- SUB-COMPONENT: SUBJECT LIST ITEM ---
+// --- SUB-COMPONENT ---
 function SubjectItem({ node, index, domainId }: { node: KnowledgeNode, index: number, domainId: number }) {
-  // Staggered animation delay
   const style = { animationDelay: `${index * 75}ms` };
 
   return (
     <Link 
-      // Link to the Learning View (Topic Explorer)
       href={`/courses/${domainId}/${node.id}`}
       className="group flex items-center p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:shadow-md transition-all duration-200 animate-fade-in"
       style={style}
     >
-      {/* Icon Box */}
       <div className="w-12 h-12 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
         <Book className="w-6 h-6" />
       </div>
 
-      {/* Text Info */}
       <div className="flex-1 min-w-0">
         <h3 className="text-lg font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
           {node.name}
@@ -157,7 +162,6 @@ function SubjectItem({ node, index, domainId }: { node: KnowledgeNode, index: nu
         </p>
       </div>
 
-      {/* Arrow Action */}
       <div className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all">
         <ChevronRight className="w-5 h-5" />
       </div>

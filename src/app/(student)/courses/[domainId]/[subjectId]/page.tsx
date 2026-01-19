@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { KnowledgeNode, Resource } from '@/types';
 import { SidebarTree } from '@/components/student/sidebar-tree';
-import { ContentViewer } from '@/components/student/content-viewer'; // Import the new component
+import { ContentViewer } from '@/components/student/content-viewer';
 import { useUi } from '@/components/providers/ui-provider';
 import { 
   ChevronLeft, 
@@ -43,8 +43,19 @@ export default function LearningPage() {
         const subjectRes = await api.get(`/nodes/${subjectId}/`);
         setSubject(subjectRes.data);
 
+        // Fetch the Tree (Topics -> Subtopics)
         const treeRes = await api.get(`/nodes/?parent=${subjectId}`);
-        setTreeNodes(treeRes.data);
+        
+        // FIX: Handle Pagination for the Tree
+        let nodesData: KnowledgeNode[] = [];
+        if (treeRes.data.results && Array.isArray(treeRes.data.results)) {
+          nodesData = treeRes.data.results;
+        } else if (Array.isArray(treeRes.data)) {
+          nodesData = treeRes.data;
+        }
+        
+        setTreeNodes(nodesData);
+
       } catch (error) {
         console.error("Failed to load course data", error);
       } finally {
@@ -67,11 +78,18 @@ export default function LearningPage() {
         // Fetch resources attached to this specific node
         const response = await api.get(`/resources/?node=${activeNode.id}`);
         
+        // FIX: Handle Pagination for Resources
+        let resourcesList: Resource[] = [];
+        if (response.data.results && Array.isArray(response.data.results)) {
+          resourcesList = response.data.results;
+        } else if (Array.isArray(response.data)) {
+          resourcesList = response.data;
+        }
+
         // Logic: A node might have multiple resources, or none.
         // For this MVP, we take the first resource found.
-        const resources = response.data;
-        if (Array.isArray(resources) && resources.length > 0) {
-          setActiveResource(resources[0]);
+        if (resourcesList.length > 0) {
+          setActiveResource(resourcesList[0]);
         } else {
           setActiveResource(null);
         }
