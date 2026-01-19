@@ -9,14 +9,14 @@ import {
   ArrowLeft, 
   ChevronRight, 
   Book, 
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
-import { Loader2 } from 'lucide-react';
 
 export default function SubjectSelectionPage() {
   const params = useParams();
   const router = useRouter();
-  const domainId = params.domainId;
+  const domainId = params.domainId ? Number(params.domainId) : 0;
 
   const [domain, setDomain] = useState<KnowledgeNode | null>(null);
   const [subjects, setSubjects] = useState<KnowledgeNode[]>([]);
@@ -25,14 +25,13 @@ export default function SubjectSelectionPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Fetch the Domain Details (Parent)
+        // 1. Fetch the Domain Details (to get the name "Science")
         const domainRes = await api.get(`/nodes/${domainId}/`);
         setDomain(domainRes.data);
 
-        // 2. Fetch the Subjects (Children)
+        // 2. Fetch the List
         const subjectsRes = await api.get(`/nodes/?parent=${domainId}`);
         
-        // Unwrap the Django pagination result
         let rawList: KnowledgeNode[] = [];
         if (subjectsRes.data.results && Array.isArray(subjectsRes.data.results)) {
           rawList = subjectsRes.data.results;
@@ -40,18 +39,26 @@ export default function SubjectSelectionPage() {
           rawList = subjectsRes.data;
         }
 
-        // --- CRITICAL FIX: STRICT FILTERING ---
-        // We ensure that we ONLY show nodes that are children of the current ID.
-        // This fixes the issue where the API might return "Root Domains" by mistake.
-        const filteredSubjects = rawList.filter(node => node.parent === Number(domainId));
+        console.log("Raw Response:", rawList);
 
-        // Sort by order just to be safe
-        filteredSubjects.sort((a, b) => (a.order || 0) - (b.order || 0));
-
-        console.log("Raw API Response:", rawList);
-        console.log("Filtered Subjects:", filteredSubjects);
+        // --- INTELLIGENT DATA EXTRACTION ---
         
-        setSubjects(filteredSubjects);
+        // Strategy A: Direct Children (Standard API behavior)
+        // Does the list contain items whose parent IS the current domain?
+        let foundSubjects = rawList.filter(node => node.parent === domainId);
+
+        // Strategy B: Nested Children (Your current API behavior)
+        // If Strategy A failed, look for the Domain itself in the list, and grab its children.
+        if (foundSubjects.length === 0) {
+          const selfNode = rawList.find(node => node.id === domainId);
+          if (selfNode && selfNode.children && selfNode.children.length > 0) {
+             console.log("Found nested children in:", selfNode.name);
+             foundSubjects = selfNode.children;
+          }
+        }
+
+        console.log("Final Subject List:", foundSubjects);
+        setSubjects(foundSubjects);
         
       } catch (error) {
         console.error("Failed to fetch subjects", error);
@@ -65,7 +72,7 @@ export default function SubjectSelectionPage() {
     }
   }, [domainId]);
 
-  // --- LOADING STATE ---
+  // --- LOADING ---
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -74,15 +81,12 @@ export default function SubjectSelectionPage() {
     );
   }
 
-  // --- ERROR STATE ---
+  // --- NOT FOUND ---
   if (!domain) {
     return (
       <div className="text-center py-20">
         <h2 className="text-xl font-bold text-slate-900">Domain not found</h2>
-        <button 
-          onClick={() => router.back()}
-          className="mt-4 text-blue-600 hover:underline"
-        >
+        <button onClick={() => router.back()} className="mt-4 text-blue-600 hover:underline">
           Go Back
         </button>
       </div>
@@ -92,7 +96,7 @@ export default function SubjectSelectionPage() {
   return (
     <div className="space-y-8 pb-10">
       
-      {/* --- BREADCRUMBS & HEADER --- */}
+      {/* HEADER */}
       <div className="space-y-4">
         <nav className="flex items-center text-sm text-slate-500 animate-fade-in">
           <Link href="/dashboard" className="hover:text-blue-600 transition-colors">
@@ -124,7 +128,7 @@ export default function SubjectSelectionPage() {
         </div>
       </div>
 
-      {/* --- SUBJECTS LIST --- */}
+      {/* LIST */}
       <div className="grid grid-cols-1 gap-4">
         {subjects.length > 0 ? (
           subjects.map((subject, index) => (
@@ -137,7 +141,8 @@ export default function SubjectSelectionPage() {
             </div>
             <h3 className="text-lg font-semibold text-slate-900">No Subjects Found</h3>
             <p className="text-slate-500 max-w-sm mx-auto mt-1">
-              We found 0 items that are children of "{domain.name}".
+              {/* Debug helper for you */}
+              Checked nested children of ID {domainId} but found nothing.
             </p>
           </div>
         )}
@@ -146,7 +151,6 @@ export default function SubjectSelectionPage() {
   );
 }
 
-// --- SUB-COMPONENT ---
 function SubjectItem({ node, index, domainId }: { node: KnowledgeNode, index: number, domainId: number }) {
   const style = { animationDelay: `${index * 75}ms` };
 
@@ -167,7 +171,7 @@ function SubjectItem({ node, index, domainId }: { node: KnowledgeNode, index: nu
         <p className="text-sm text-slate-500 flex items-center gap-4 mt-0.5">
           <span className="flex items-center gap-1">
             <Sparkles className="w-3 h-3" />
-            {node.items_count ? `${node.items_count} Topics` : 'Start Learning'}
+            Start Learning
           </span>
         </p>
       </div>
