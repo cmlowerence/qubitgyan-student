@@ -6,71 +6,39 @@ import { cn } from '@/lib/utils';
 import { 
   CheckCircle, 
   FileText, 
-  PlayCircle, 
-  ExternalLink, 
-  AlertCircle 
+  ExternalLink 
 } from 'lucide-react';
 import { useUi } from '@/components/providers/ui-provider';
 import api from '@/lib/api';
 
 interface ContentViewerProps {
-  resource: Resource | null; // It might be null if a topic has no resources attached yet
+  resource: Resource | null;
   nodeId: number;
   onComplete?: () => void;
 }
 
 export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerProps) {
-  const { showConfirm, showAlert } = useUi();
+  const { showAlert } = useUi();
   const [isCompleting, setIsCompleting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(resource?.is_completed || false);
 
-  // --- HELPER: FORMAT DRIVE LINKS ---
-  const getEmbedUrl = (url?: string, type?: string) => {
-    if (!url) return '';
-    
-    // Google Drive Magic: Convert /view to /preview for clean embedding
-    if (url.includes('drive.google.com')) {
-      return url.replace('/view', '/preview');
-    }
-    
-    // YouTube Magic: Convert watch?v= to embed/
-    if (url.includes('youtube.com/watch')) {
-      const videoId = url.split('v=')[1]?.split('&')[0];
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-    if (url.includes('youtu.be/')) {
-      const videoId = url.split('youtu.be/')[1];
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-
-    return url;
-  };
-
-  // --- HANDLER: MARK COMPLETE ---
   const handleMarkComplete = async () => {
     if (isCompleted) return;
-
-    // Optimistic UI update (feels faster)
     setIsCompleted(true);
     setIsCompleting(true);
 
     try {
-      // API call to mark progress
       await api.post('/progress/', {
         resource: resource?.id,
         is_completed: true
       });
-      
-      // Optional: Trigger parent callback (e.g., to show a "Next Lesson" toast)
       if (onComplete) onComplete();
-
     } catch (error) {
       console.error("Failed to mark complete", error);
-      // Revert if failed
       setIsCompleted(false);
       showAlert({ 
         title: "Error", 
-        message: "Could not save progress. Please check your internet.", 
+        message: "Could not save progress.", 
         variant: "error" 
       });
     } finally {
@@ -78,7 +46,6 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
     }
   };
 
-  // --- EMPTY STATE (No Resource) ---
   if (!resource) {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300">
@@ -88,12 +55,14 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
     );
   }
 
-  const embedUrl = getEmbedUrl(resource.google_drive_id || resource.external_url);
+  // USE THE BACKEND FIELD DIRECTLY
+  // If preview_link is missing, fall back to external_url
+  const embedUrl = resource.preview_link || resource.external_url;
 
   return (
     <div className="space-y-6 animate-fade-in">
       
-      {/* 1. TITLE HEADER */}
+      {/* HEADER */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -115,11 +84,10 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
         </div>
       </div>
 
-      {/* 2. THE PLAYER / VIEWER */}
+      {/* PLAYER */}
       <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-900/10 relative aspect-video group">
         
-        {resource.resource_type === 'LINK' ? (
-          // Link Type: Show a big button instead of iframe
+        {resource.resource_type === 'LINK' || !embedUrl ? (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
             <a 
               href={resource.external_url} 
@@ -131,7 +99,6 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
             </a>
           </div>
         ) : (
-          // Video/PDF Type: iFrame
           <iframe 
             src={embedUrl} 
             className="w-full h-full border-0 bg-slate-50"
@@ -142,7 +109,7 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
         )}
       </div>
 
-      {/* 3. ACTION BAR */}
+      {/* FOOTER ACTION */}
       <div className="flex justify-end">
         <button
           onClick={handleMarkComplete}
@@ -167,7 +134,6 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
           )}
         </button>
       </div>
-
     </div>
   );
 }
