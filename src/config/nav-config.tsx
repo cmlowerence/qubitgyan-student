@@ -17,11 +17,6 @@ export const studentNavItems = [
     icon: FileText,
   },
   {
-    title: 'Admission Form',
-    href: '/admission',
-    icon: ClipboardCheck,
-  },
-  {
     title: 'Profile',
     href: '/profile',
     icon: User,

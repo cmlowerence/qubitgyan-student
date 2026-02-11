@@ -7,7 +7,7 @@ import { KnowledgeNode } from '@/types';
 import { FileSearch, FolderOpen } from 'lucide-react';
 
 export default function ResourcesPage() {
-  const [domains, setDomains] = useState<KnowledgeNode[]>([]);
+  const [tracks, setDomains] = useState<KnowledgeNode[]>([]);
 
   useEffect(() => {
     getDomains().then(setDomains);
@@ -21,7 +21,7 @@ export default function ResourcesPage() {
       </section>
 
       <div className="grid md:grid-cols-2 gap-4">
-        {domains.map((domain) => (
+        {tracks.map((domain) => (
           <DomainResourceCard key={domain.id} domain={domain} />
         ))}
       </div>

@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -9,6 +8,8 @@ import { studentNavItems } from '@/config/nav-config';
 import { useAuth } from '@/context/auth-context';
 import { useUi } from '@/components/providers/ui-provider';
 import { LogOut, Sparkles, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { getProgressSummary } from '@/lib/learning';
 
 interface SidebarProps {
   className?: string;
@@ -19,6 +20,11 @@ export function Sidebar({ className, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { showConfirm } = useUi();
+  const [streak, setStreak] = useState(0);
+
+  useEffect(() => {
+    getProgressSummary().then((summary) => setStreak(summary.streakDays));
+  }, []);
 
   const handleLogout = async () => {
     const confirmed = await showConfirm({
@@ -34,7 +40,7 @@ export function Sidebar({ className, onClose }: SidebarProps) {
   return (
     <div className={cn('flex flex-col h-full bg-slate-950 text-white', className)}>
       <div className="p-5 flex items-center justify-between border-b border-slate-800/80">
-        <Logo className="scale-75 origin-left" />
+        <Logo theme="dark" className="scale-75 origin-left" />
         {onClose && (
           <button onClick={onClose} className="lg:hidden p-2 hover:bg-slate-800 rounded-xl transition-colors">
             <X className="w-5 h-5 text-slate-300" />
@@ -45,7 +51,7 @@ export function Sidebar({ className, onClose }: SidebarProps) {
       <div className="px-4 py-3">
         <div className="rounded-2xl bg-gradient-to-r from-violet-600/20 via-cyan-500/20 to-emerald-500/20 border border-white/10 p-3">
           <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Learning Streak</p>
-          <p className="text-xl font-bold mt-1">7 Days 🔥</p>
+          <p className="text-xl font-bold mt-1">{streak} Day{streak === 1 ? '' : 's'} 🔥</p>
           <p className="text-xs text-slate-300 mt-1">Keep your momentum and unlock badges.</p>
         </div>
       </div>

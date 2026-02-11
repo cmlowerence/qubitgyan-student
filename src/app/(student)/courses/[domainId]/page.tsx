@@ -21,9 +21,9 @@ export default function SubjectSelectionPage() {
   return (
     <div className="space-y-5 pb-10">
       <section className="rounded-3xl p-6 border border-slate-200 bg-white">
-        <p className="text-sm text-slate-500">Domain</p>
+        <p className="text-sm text-slate-500">Track</p>
         <h1 className="text-3xl font-black text-slate-900">{domain?.name || 'Loading...'}</h1>
-        <p className="mt-2 text-slate-500">Pick a subject and open the new flat interactive explorer (no deep tree pain).</p>
+        <p className="mt-2 text-slate-500">Pick a subject and open the interactive explorer with quick lesson access.</p>
       </section>
 
       <div className="grid md:grid-cols-2 gap-4">

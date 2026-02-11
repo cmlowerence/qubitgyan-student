@@ -1,35 +1,24 @@
 import api from '@/lib/api';
-import { KnowledgeNode, Resource } from '@/types';
+import { KnowledgeNode, Resource, StudentProgress } from '@/types';
+
+interface SearchNode {
+  id: number;
+  name: string;
+  href: string;
+  type: KnowledgeNode['node_type'];
+}
 
 const sampleDomains: KnowledgeNode[] = [
   { id: 101, name: 'Physics Mastery', node_type: 'DOMAIN', parent: null, order: 1, is_active: true },
   { id: 102, name: 'Math Intelligence', node_type: 'DOMAIN', parent: null, order: 2, is_active: true },
-  { id: 103, name: 'Computer Science', node_type: 'DOMAIN', parent: null, order: 3, is_active: true },
 ];
 
 const sampleSubjects: Record<number, KnowledgeNode[]> = {
-  101: [
-    { id: 201, name: 'Mechanics', node_type: 'SUBJECT', parent: 101, order: 1, is_active: true },
-    { id: 202, name: 'Electromagnetism', node_type: 'SUBJECT', parent: 101, order: 2, is_active: true },
-  ],
-  102: [
-    { id: 203, name: 'Calculus', node_type: 'SUBJECT', parent: 102, order: 1, is_active: true },
-    { id: 204, name: 'Algebra', node_type: 'SUBJECT', parent: 102, order: 2, is_active: true },
-  ],
-  103: [
-    { id: 205, name: 'Data Structures', node_type: 'SUBJECT', parent: 103, order: 1, is_active: true },
-    { id: 206, name: 'Web Engineering', node_type: 'SUBJECT', parent: 103, order: 2, is_active: true },
-  ],
-};
-
-const sampleUnits: Record<number, KnowledgeNode[]> = {
+  101: [{ id: 201, name: 'Mechanics', node_type: 'SUBJECT', parent: 101, order: 1, is_active: true }],
+  102: [{ id: 202, name: 'Calculus', node_type: 'SUBJECT', parent: 102, order: 1, is_active: true }],
   201: [
-    { id: 301, name: 'Vectors & Motion', node_type: 'TOPIC', parent: 201, order: 1, is_active: true },
+    { id: 301, name: 'Vectors & Motion', node_type: 'SECTION', parent: 201, order: 1, is_active: true },
     { id: 302, name: 'Newton Laws', node_type: 'TOPIC', parent: 201, order: 2, is_active: true },
-  ],
-  205: [
-    { id: 303, name: 'Array Patterns', node_type: 'TOPIC', parent: 205, order: 1, is_active: true },
-    { id: 304, name: 'Linked Lists', node_type: 'TOPIC', parent: 205, order: 2, is_active: true },
   ],
 };
 
@@ -44,25 +33,6 @@ const sampleResources: Record<number, Resource[]> = {
       preview_link: 'https://www.youtube.com/embed/7UuNQvQbV4w',
       order: 1,
     },
-    {
-      id: 502,
-      title: 'Motion Formula Handbook',
-      resource_type: 'PDF',
-      node: 301,
-      external_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-      order: 2,
-    },
-  ],
-  303: [
-    {
-      id: 503,
-      title: 'Array Cheatsheet',
-      resource_type: 'ARTICLE',
-      node: 303,
-      content_text:
-        'Learn two-pointer, sliding window, and prefix sum techniques. Start with brute force, then optimize with space-time trade-offs.',
-      order: 1,
-    },
   ],
 };
 
@@ -74,11 +44,65 @@ function extractList<T>(data: unknown): T[] {
   return [];
 }
 
+function flattenNodes(nodes: KnowledgeNode[]): KnowledgeNode[] {
+  const flat: KnowledgeNode[] = [];
+  const walk = (items: KnowledgeNode[]) => {
+    for (const item of items) {
+      flat.push(item);
+      if (item.children?.length) walk(item.children);
+    }
+  };
+  walk(nodes);
+  return flat;
+}
+
+async function getTreeAndFlat() {
+  const { data } = await api.get('/nodes/');
+  const tree = extractList<KnowledgeNode>(data);
+  return { tree, flat: flattenNodes(tree) };
+}
+
+function getAncestorChain(nodeId: number, map: Map<number, KnowledgeNode>): KnowledgeNode[] {
+  const chain: KnowledgeNode[] = [];
+  let cursor = map.get(nodeId);
+  while (cursor) {
+    chain.unshift(cursor);
+    cursor = cursor.parent ? map.get(cursor.parent) : undefined;
+  }
+  return chain;
+}
+
+function toSearchNodes(flat: KnowledgeNode[]): SearchNode[] {
+  const map = new Map(flat.map((node) => [node.id, node]));
+  return flat
+    .map((node) => {
+      const chain = getAncestorChain(node.id, map);
+      const domain = chain.find((item) => item.node_type === 'DOMAIN');
+      const subject = chain.find((item) => item.node_type === 'SUBJECT');
+      if (!domain) return null;
+
+      if (node.node_type === 'DOMAIN') {
+        return { id: node.id, name: node.name, href: `/courses/${node.id}`, type: node.node_type };
+      }
+
+      if (subject) {
+        return {
+          id: node.id,
+          name: chain.map((item) => item.name).join(' • '),
+          href: `/courses/${domain.id}/${subject.id}?unit=${node.id}`,
+          type: node.node_type,
+        };
+      }
+
+      return { id: node.id, name: node.name, href: `/courses/${domain.id}`, type: node.node_type };
+    })
+    .filter(Boolean) as SearchNode[];
+}
+
 export async function getDomains(): Promise<KnowledgeNode[]> {
   try {
-    const { data } = await api.get('/nodes/');
-    const nodes = extractList<KnowledgeNode>(data);
-    const domains = nodes.filter((node) => node.parent === null || node.node_type === 'DOMAIN');
+    const { flat } = await getTreeAndFlat();
+    const domains = flat.filter((node) => node.parent === null && node.node_type === 'DOMAIN');
     return domains.length ? domains : sampleDomains;
   } catch {
     return sampleDomains;
@@ -87,24 +111,50 @@ export async function getDomains(): Promise<KnowledgeNode[]> {
 
 export async function getChildren(parentId: number): Promise<KnowledgeNode[]> {
   try {
-    const { data } = await api.get(`/nodes/?parent=${parentId}`);
-    const nodes = extractList<KnowledgeNode>(data)
+    const { flat } = await getTreeAndFlat();
+    const children = flat
       .filter((node) => node.parent === parentId)
       .sort((a, b) => (a.order || 0) - (b.order || 0));
-    if (nodes.length) return nodes;
+    if (children.length) return children;
   } catch {
-    // fallthrough to local samples
+    // fallback
   }
 
-  return sampleSubjects[parentId] || sampleUnits[parentId] || [];
+  return sampleSubjects[parentId] || [];
+}
+
+export async function getDescendantStudyNodes(subjectId: number): Promise<KnowledgeNode[]> {
+  try {
+    const { flat } = await getTreeAndFlat();
+    const byParent = new Map<number, KnowledgeNode[]>();
+    flat.forEach((node) => {
+      if (node.parent == null) return;
+      const list = byParent.get(node.parent) || [];
+      list.push(node);
+      byParent.set(node.parent, list);
+    });
+
+    const queue = [...(byParent.get(subjectId) || [])];
+    const descendants: KnowledgeNode[] = [];
+    while (queue.length) {
+      const node = queue.shift()!;
+      descendants.push(node);
+      queue.push(...(byParent.get(node.id) || []));
+    }
+
+    const study = descendants.filter((node) => ['SECTION', 'TOPIC', 'SUBTOPIC'].includes(node.node_type) || (node.resource_count || 0) > 0);
+    return study.sort((a, b) => (a.order || 0) - (b.order || 0));
+  } catch {
+    return sampleSubjects[subjectId] || [];
+  }
 }
 
 export async function getNode(nodeId: number): Promise<KnowledgeNode | null> {
   try {
-    const { data } = await api.get(`/nodes/${nodeId}/`);
-    return data as KnowledgeNode;
+    const { flat } = await getTreeAndFlat();
+    return flat.find((node) => node.id === nodeId) || null;
   } catch {
-    const all = [...sampleDomains, ...Object.values(sampleSubjects).flat(), ...Object.values(sampleUnits).flat()];
+    const all = [...sampleDomains, ...Object.values(sampleSubjects).flat()];
     return all.find((node) => node.id === nodeId) || null;
   }
 }
@@ -112,9 +162,39 @@ export async function getNode(nodeId: number): Promise<KnowledgeNode | null> {
 export async function getResources(nodeId: number): Promise<Resource[]> {
   try {
     const { data } = await api.get(`/resources/?node=${nodeId}`);
-    const resources = extractList<Resource>(data).sort((a, b) => (a.order || 0) - (b.order || 0));
-    return resources.length ? resources : sampleResources[nodeId] || [];
+    return extractList<Resource>(data).sort((a, b) => (a.order || 0) - (b.order || 0));
   } catch {
     return sampleResources[nodeId] || [];
   }
 }
+
+export async function getSearchNodes(): Promise<SearchNode[]> {
+  try {
+    const { flat } = await getTreeAndFlat();
+    return toSearchNodes(flat);
+  } catch {
+    const flat = [...sampleDomains, ...Object.values(sampleSubjects).flat()];
+    return toSearchNodes(flat);
+  }
+}
+
+export async function getProgressSummary() {
+  try {
+    const { data } = await api.get('/progress/');
+    const entries = extractList<StudentProgress>(data);
+    const completed = entries.filter((entry) => entry.is_completed);
+    const uniqueDays = new Set(completed.map((entry) => new Date(entry.last_accessed).toISOString().slice(0, 10)));
+    return {
+      completedResourceIds: new Set(completed.map((entry) => entry.resource)),
+      completedCount: completed.length,
+      streakDays: uniqueDays.size,
+      recent: completed
+        .sort((a, b) => +new Date(b.last_accessed) - +new Date(a.last_accessed))
+        .slice(0, 5),
+    };
+  } catch {
+    return { completedResourceIds: new Set<number>(), completedCount: 0, streakDays: 0, recent: [] as StudentProgress[] };
+  }
+}
+
+export type { SearchNode };

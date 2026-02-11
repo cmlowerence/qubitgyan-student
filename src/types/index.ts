@@ -14,7 +14,7 @@ export interface UserProfile {
 export interface KnowledgeNode {
   id: number;
   name: string;
-  node_type: 'DOMAIN' | 'SUBJECT' | 'TOPIC' | 'SUBTOPIC';
+  node_type: 'DOMAIN' | 'SUBJECT' | 'SECTION' | 'TOPIC' | 'SUBTOPIC';
   parent: number | null;
   order: number;
   thumbnail_url?: string;
