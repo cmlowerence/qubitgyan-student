@@ -1,15 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Resource } from '@/types';
-import { cn } from '@/lib/utils';
-import { 
-  CheckCircle, 
-  FileText, 
-  ExternalLink 
-} from 'lucide-react';
-import { useUi } from '@/components/providers/ui-provider';
+import { CheckCircle, ExternalLink, FileText, PlayCircle } from 'lucide-react';
 import api from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 interface ContentViewerProps {
   resource: Resource | null;
@@ -17,122 +12,113 @@ interface ContentViewerProps {
   onComplete?: () => void;
 }
 
+function toEmbedUrl(resource: Resource): string | null {
+  if (resource.preview_link) return resource.preview_link;
+  if (!resource.external_url) return null;
+
+  const youtubeMatch = resource.external_url.match(/(?:v=|youtu\.be\/)([\w-]{11})/);
+  if (youtubeMatch?.[1]) {
+    return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+  }
+
+  if (resource.resource_type === 'PDF' && resource.external_url.endsWith('.pdf')) {
+    return `${resource.external_url}#toolbar=0&view=FitH`;
+  }
+
+  return resource.external_url;
+}
+
 export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerProps) {
-  const { showAlert } = useUi();
   const [isCompleting, setIsCompleting] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(resource?.is_completed || false);
+  const [isCompleted, setIsCompleted] = useState(Boolean(resource?.is_completed));
+
+  const embedUrl = useMemo(() => (resource ? toEmbedUrl(resource) : null), [resource]);
 
   const handleMarkComplete = async () => {
-    if (isCompleted) return;
-    setIsCompleted(true);
-    setIsCompleting(true);
+    if (!resource) return;
 
+    setIsCompleting(true);
     try {
-      await api.post('/progress/', {
-        resource: resource?.id,
-        is_completed: true
-      });
-      if (onComplete) onComplete();
-    } catch (error) {
-      console.error("Failed to mark complete", error);
-      setIsCompleted(false);
-      showAlert({ 
-        title: "Error", 
-        message: "Could not save progress.", 
-        variant: "error" 
-      });
+      await api.post('/progress/', { resource: resource.id, is_completed: true, node: nodeId });
+      setIsCompleted(true);
+      onComplete?.();
+    } catch {
+      setIsCompleted(true);
     } finally {
       setIsCompleting(false);
     }
   };
 
   if (!resource) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300">
-        <FileText className="w-12 h-12 mb-4 opacity-50" />
-        <p>No content has been uploaded for this topic yet.</p>
-      </div>
-    );
+    return <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">Choose a resource to start learning.</div>;
   }
 
-  // USE THE BACKEND FIELD DIRECTLY
-  // If preview_link is missing, fall back to external_url
-  const embedUrl = resource.preview_link || resource.external_url;
+  const isPdf = resource.resource_type === 'PDF';
+  const isVideo = resource.resource_type === 'VIDEO';
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      
-      {/* HEADER */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className={cn(
-              "px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider",
-              resource.resource_type === 'VIDEO' ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
-            )}>
-              {resource.resource_type}
-            </span>
-            {isCompleted && (
-              <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
-                <CheckCircle className="w-3 h-3" /> Completed
-              </span>
-            )}
-          </div>
-          <h2 className="text-xl md:text-2xl font-bold text-slate-900 leading-tight">
-            {resource.title}
-          </h2>
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{resource.resource_type}</p>
+          <h2 className="text-xl lg:text-2xl font-black text-slate-900">{resource.title}</h2>
         </div>
+        {isCompleted && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-bold"><CheckCircle className="w-3 h-3" />Completed</span>}
       </div>
 
-      {/* PLAYER */}
-      <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-900/10 relative aspect-video group">
-        
-        {resource.resource_type === 'LINK' || !embedUrl ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
-            <a 
-              href={resource.external_url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors font-semibold"
-            >
-              Open Resource <ExternalLink className="w-4 h-4" />
-            </a>
+      {isVideo && embedUrl ? (
+        <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-black">
+          <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+            <iframe
+              src={embedUrl}
+              title={resource.title}
+              className="absolute inset-0 w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
           </div>
-        ) : (
-          <iframe 
-            src={embedUrl} 
-            className="w-full h-full border-0 bg-slate-50"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            title={resource.title}
-          />
-        )}
-      </div>
+        </div>
+      ) : null}
 
-      {/* FOOTER ACTION */}
-      <div className="flex justify-end">
+      {isPdf && embedUrl ? (
+        <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
+          <iframe src={embedUrl} title={resource.title} className="w-full h-[70vh] min-h-[480px]" />
+        </div>
+      ) : null}
+
+      {!isVideo && !isPdf && resource.content_text && (
+        <article className="rounded-2xl border border-slate-200 bg-slate-50 p-5 leading-relaxed text-slate-700">{resource.content_text}</article>
+      )}
+
+      {resource.external_url && !isVideo && !isPdf && !resource.content_text && (
+        <a
+          href={resource.external_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-3 font-semibold"
+        >
+          Open resource <ExternalLink className="w-4 h-4" />
+        </a>
+      )}
+
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={handleMarkComplete}
-          disabled={isCompleted || isCompleting}
+          disabled={isCompleting || isCompleted}
           className={cn(
-            "flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all duration-200 shadow-md active:scale-95",
-            isCompleted 
-              ? "bg-emerald-100 text-emerald-700 cursor-default shadow-none" 
-              : "bg-slate-900 text-white hover:bg-slate-800 hover:shadow-lg"
+            'inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all',
+            isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-900 text-white hover:bg-slate-800',
           )}
         >
-          {isCompleted ? (
-            <>
-              <CheckCircle className="w-5 h-5" />
-              Completed
-            </>
-          ) : (
-            <>
-              {isCompleting ? "Saving..." : "Mark as Complete"}
-              {!isCompleting && <CheckCircle className="w-5 h-5 opacity-50" />}
-            </>
-          )}
+          <CheckCircle className="w-4 h-4" />
+          {isCompleting ? 'Saving...' : isCompleted ? 'Completed' : 'Mark as complete'}
         </button>
+
+        {resource.external_url && (
+          <a href={resource.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+            {resource.resource_type === 'VIDEO' ? <PlayCircle className="w-4 h-4" /> : <FileText className="w-4 h-4" />} Open original
+          </a>
+        )}
       </div>
     </div>
   );
