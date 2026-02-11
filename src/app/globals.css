@@ -2,46 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-/* FIX: We removed the :root variables because they require 
-   complex configuration that was breaking the build.
-   We are using standard Tailwind colors below instead.
-*/
-
 @layer base {
   * {
-    @apply border-gray-200;
+    @apply border-slate-200;
   }
+
+  html,
   body {
-    /* Changed 'bg-background' to 'bg-slate-50' (Standard Tailwind) */
-    @apply bg-slate-50 text-slate-900; 
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+
+  ::selection {
+    @apply bg-cyan-200 text-slate-900;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
   }
 }
 
 @layer utilities {
-  .animate-breath {
-    animation: breath 3s ease-in-out infinite;
+  .glass {
+    @apply bg-white/60 backdrop-blur-xl border border-white/40;
   }
-  
-  .animate-in-scale {
-    animation: inScale 0.2s ease-out forwards;
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-violet-600 to-cyan-600 bg-clip-text text-transparent;
   }
-  
-  .animate-fade-in {
-    animation: fadeIn 0.2s ease-out forwards;
+
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .animate-pulse-soft {
+    animation: pulseSoft 2.2s ease-in-out infinite;
   }
 }
 
-@keyframes breath {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.98); }
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
-@keyframes inScale {
-  0% { opacity: 0; transform: scale(0.95); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes pulseSoft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
