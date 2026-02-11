@@ -1,184 +1,51 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import api from '@/lib/api';
-import { KnowledgeNode } from '@/types';
 import Link from 'next/link';
-import { 
-  ArrowLeft, 
-  ChevronRight, 
-  Book, 
-  Sparkles,
-  Loader2
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { getChildren, getNode } from '@/lib/learning';
+import { KnowledgeNode } from '@/types';
+import { ChevronRight, LibraryBig } from 'lucide-react';
 
 export default function SubjectSelectionPage() {
   const params = useParams();
-  const router = useRouter();
-  const domainId = params.domainId ? Number(params.domainId) : 0;
-
+  const domainId = Number(params.domainId);
   const [domain, setDomain] = useState<KnowledgeNode | null>(null);
   const [subjects, setSubjects] = useState<KnowledgeNode[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // 1. Fetch the Domain Details (to get the name "Science")
-        const domainRes = await api.get(`/nodes/${domainId}/`);
-        setDomain(domainRes.data);
-
-        // 2. Fetch the List
-        const subjectsRes = await api.get(`/nodes/?parent=${domainId}`);
-        
-        let rawList: KnowledgeNode[] = [];
-        if (subjectsRes.data.results && Array.isArray(subjectsRes.data.results)) {
-          rawList = subjectsRes.data.results;
-        } else if (Array.isArray(subjectsRes.data)) {
-          rawList = subjectsRes.data;
-        }
-
-        console.log("Raw Response:", rawList);
-
-        // --- INTELLIGENT DATA EXTRACTION ---
-        
-        // Strategy A: Direct Children (Standard API behavior)
-        // Does the list contain items whose parent IS the current domain?
-        let foundSubjects = rawList.filter(node => node.parent === domainId);
-
-        // Strategy B: Nested Children (Your current API behavior)
-        // If Strategy A failed, look for the Domain itself in the list, and grab its children.
-        if (foundSubjects.length === 0) {
-          const selfNode = rawList.find(node => node.id === domainId);
-          if (selfNode && selfNode.children && selfNode.children.length > 0) {
-             console.log("Found nested children in:", selfNode.name);
-             foundSubjects = selfNode.children;
-          }
-        }
-
-        console.log("Final Subject List:", foundSubjects);
-        setSubjects(foundSubjects);
-        
-      } catch (error) {
-        console.error("Failed to fetch subjects", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (domainId) {
-      fetchData();
-    }
+    getNode(domainId).then(setDomain);
+    getChildren(domainId).then(setSubjects);
   }, [domainId]);
 
-  // --- LOADING ---
-  if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
-  // --- NOT FOUND ---
-  if (!domain) {
-    return (
-      <div className="text-center py-20">
-        <h2 className="text-xl font-bold text-slate-900">Domain not found</h2>
-        <button onClick={() => router.back()} className="mt-4 text-blue-600 hover:underline">
-          Go Back
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-8 pb-10">
-      
-      {/* HEADER */}
-      <div className="space-y-4">
-        <nav className="flex items-center text-sm text-slate-500 animate-fade-in">
-          <Link href="/dashboard" className="hover:text-blue-600 transition-colors">
-            Dashboard
-          </Link>
-          <ChevronRight className="w-4 h-4 mx-2" />
-          <span className="font-semibold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
-            {domain.name}
-          </span>
-        </nav>
+    <div className="space-y-5 pb-10">
+      <section className="rounded-3xl p-6 border border-slate-200 bg-white">
+        <p className="text-sm text-slate-500">Domain</p>
+        <h1 className="text-3xl font-black text-slate-900">{domain?.name || 'Loading...'}</h1>
+        <p className="mt-2 text-slate-500">Pick a subject and open the new flat interactive explorer (no deep tree pain).</p>
+      </section>
 
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-              {domain.name}
-            </h1>
-            <p className="text-slate-500 mt-1">
-              Select a subject to begin your learning path.
-            </p>
-          </div>
-          
-          <button 
-            onClick={() => router.back()}
-            className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+      <div className="grid md:grid-cols-2 gap-4">
+        {subjects.map((subject) => (
+          <Link
+            href={`/courses/${domainId}/${subject.id}`}
+            key={subject.id}
+            className="rounded-3xl border border-slate-200 bg-white p-5 hover:shadow-lg transition-all group"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-
-      {/* LIST */}
-      <div className="grid grid-cols-1 gap-4">
-        {subjects.length > 0 ? (
-          subjects.map((subject, index) => (
-            <SubjectItem key={subject.id} node={subject} index={index} domainId={domain.id} />
-          ))
-        ) : (
-          <div className="bg-slate-50 rounded-xl p-12 text-center border border-dashed border-slate-300">
-            <div className="bg-slate-200 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Book className="w-6 h-6 text-slate-400" />
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-11 h-11 rounded-2xl bg-cyan-100 text-cyan-700 flex items-center justify-center">
+                <LibraryBig className="w-5 h-5" />
+              </div>
+              <h2 className="font-bold text-lg">{subject.name}</h2>
             </div>
-            <h3 className="text-lg font-semibold text-slate-900">No Subjects Found</h3>
-            <p className="text-slate-500 max-w-sm mx-auto mt-1">
-              {/* Debug helper for you */}
-              Checked nested children of ID {domainId} but found nothing.
-            </p>
-          </div>
-        )}
+            <p className="text-sm text-slate-500">Structured units with responsive video and PDF reading.</p>
+            <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-cyan-700">
+              Open subject <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </span>
+          </Link>
+        ))}
       </div>
     </div>
-  );
-}
-
-function SubjectItem({ node, index, domainId }: { node: KnowledgeNode, index: number, domainId: number }) {
-  const style = { animationDelay: `${index * 75}ms` };
-
-  return (
-    <Link 
-      href={`/courses/${domainId}/${node.id}`}
-      className="group flex items-center p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:shadow-md transition-all duration-200 animate-fade-in"
-      style={style}
-    >
-      <div className="w-12 h-12 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-        <Book className="w-6 h-6" />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <h3 className="text-lg font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
-          {node.name}
-        </h3>
-        <p className="text-sm text-slate-500 flex items-center gap-4 mt-0.5">
-          <span className="flex items-center gap-1">
-            <Sparkles className="w-3 h-3" />
-            Start Learning
-          </span>
-        </p>
-      </div>
-
-      <div className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all">
-        <ChevronRight className="w-5 h-5" />
-      </div>
-    </Link>
   );
 }
