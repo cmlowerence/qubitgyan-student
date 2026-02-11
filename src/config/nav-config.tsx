@@ -1,4 +1,4 @@
-import { LayoutDashboard, BookOpen, User, FileText } from 'lucide-react';
+import { LayoutDashboard, BookOpen, User, FileText, ClipboardCheck } from 'lucide-react';
 
 export const studentNavItems = [
   {
