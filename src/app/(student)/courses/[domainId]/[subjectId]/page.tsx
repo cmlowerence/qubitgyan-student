@@ -54,7 +54,7 @@ export default function SubjectLearningPage() {
   const filteredUnits = useMemo(() => units.filter((unit) => unit.name.toLowerCase().includes(query.toLowerCase())), [units, query]);
 
   return (
-    <div className="grid xl:grid-cols-[360px,1fr] gap-5 pb-8 min-h-[calc(100vh-9rem)]">
+    <div className="grid xl:grid-cols-[360px,1fr] gap-4 lg:gap-5 pb-8 min-h-[calc(100vh-9rem)]">
       <aside className="rounded-3xl border border-slate-200 bg-white p-4 h-fit xl:sticky xl:top-8">
         <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Subject</p>
         <h1 className="text-2xl font-black text-slate-900 mt-1">{subject?.name || 'Loading...'}</h1>
@@ -64,7 +64,7 @@ export default function SubjectLearningPage() {
           <input className="bg-transparent outline-none w-full text-sm" placeholder="Search lesson/unit..." value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
 
-        <div className="mt-4 space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+        <div className="mt-4 space-y-2 max-h-[45vh] sm:max-h-[55vh] overflow-y-auto pr-1">
           {filteredUnits.map((unit) => (
             <button
               key={unit.id}
@@ -81,7 +81,7 @@ export default function SubjectLearningPage() {
         </div>
       </aside>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 lg:p-6 space-y-4">
+      <section className="rounded-3xl border border-slate-200 bg-white p-3 sm:p-4 lg:p-6 space-y-4">
         <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-3 text-sm flex items-center gap-2 text-fuchsia-700">
           <Sparkles className="w-4 h-4" />
           Fast explorer view for lessons and resources.
@@ -89,7 +89,7 @@ export default function SubjectLearningPage() {
 
         {resources.length > 0 ? (
           <>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
               {resources.map((resource) => (
                 <button
                   key={resource.id}

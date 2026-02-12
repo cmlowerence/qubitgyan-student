@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Resource } from '@/types';
-import { CheckCircle, ExternalLink, FileText, PlayCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, ExternalLink, FileText, PlayCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useUi } from '@/components/providers/ui-provider';
 
 interface ContentViewerProps {
   resource: Resource | null;
@@ -12,13 +13,37 @@ interface ContentViewerProps {
   onComplete?: () => void;
 }
 
+function getYoutubeId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+
+    if (parsed.hostname.includes('youtu.be')) {
+      return parsed.pathname.split('/').filter(Boolean)[0] || null;
+    }
+
+    const v = parsed.searchParams.get('v');
+    if (v) return v;
+
+    const pathMatch = parsed.pathname.match(/\/embed\/([\w-]{11})/);
+    if (pathMatch?.[1]) return pathMatch[1];
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 function toEmbedUrl(resource: Resource): string | null {
   if (resource.preview_link) return resource.preview_link;
   if (!resource.external_url) return null;
 
-  const youtubeMatch = resource.external_url.match(/(?:v=|youtu\.be\/)([\w-]{11})/);
-  if (youtubeMatch?.[1]) return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
-  if (resource.resource_type === 'PDF' && resource.external_url.endsWith('.pdf')) return `${resource.external_url}#toolbar=0&view=FitH`;
+  const youtubeId = getYoutubeId(resource.external_url);
+  if (youtubeId) return `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&modestbranding=1`;
+
+  if (resource.resource_type === 'PDF' && resource.external_url.endsWith('.pdf')) {
+    return `${resource.external_url}#toolbar=0&view=FitH`;
+  }
+
   return resource.external_url;
 }
 
@@ -28,12 +53,15 @@ function isPlayableVideo(url?: string) {
 }
 
 export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerProps) {
+  const { showAlert } = useUi();
   const [isCompleting, setIsCompleting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(Boolean(resource?.is_completed));
+  const [iframeError, setIframeError] = useState(false);
   const embedUrl = useMemo(() => (resource ? toEmbedUrl(resource) : null), [resource]);
 
   useEffect(() => {
     setIsCompleted(Boolean(resource?.is_completed));
+    setIframeError(false);
   }, [resource]);
 
   const handleMarkComplete = async () => {
@@ -43,7 +71,17 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
       await api.post('/progress/', { resource: resource.id, is_completed: true, node: nodeId });
       setIsCompleted(true);
       onComplete?.();
+      await showAlert({
+        title: 'Progress saved',
+        message: 'Great work! This resource has been marked as completed.',
+        variant: 'success',
+      });
     } catch {
+      await showAlert({
+        title: 'Saved locally',
+        message: 'We could not reach the server right now. Your completion is kept in this session.',
+        variant: 'warning',
+      });
       setIsCompleted(true);
       onComplete?.();
     } finally {
@@ -72,20 +110,38 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
 
       {isVideo && embedUrl ? (
         <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-black">
-          {isPlayableVideo(embedUrl) ? (
+          {iframeError ? (
+            <div className="bg-slate-950 text-slate-100 p-5 sm:p-7 space-y-3">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-amber-300">
+                <AlertCircle className="w-4 h-4" />Embedded player unavailable
+              </p>
+              <p className="text-sm text-slate-300">This source blocks in-app playback on some browsers. You can still open and watch it in a new tab.</p>
+              {resource.external_url && (
+                <a href={resource.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-white text-slate-900 px-4 py-2 text-sm font-semibold">
+                  Open video directly <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+            </div>
+          ) : isPlayableVideo(embedUrl) ? (
             <video controls playsInline className="w-full max-h-[72vh] bg-black">
               <source src={embedUrl} />
               Your browser does not support the video tag.
             </video>
           ) : (
-            <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+            <div className="space-y-2">
+              <p className="px-3 pt-3 text-xs text-slate-300">If the player does not load, use "Open original" below.</p>
+              <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
               <iframe
                 src={embedUrl}
                 title={resource.title}
                 className="absolute inset-0 w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                referrerPolicy="strict-origin-when-cross-origin"
+                onError={() => setIframeError(true)}
+                onLoad={() => setIframeError(false)}
                 allowFullScreen
               />
+              </div>
             </div>
           )}
         </div>
