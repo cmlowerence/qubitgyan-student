@@ -87,6 +87,7 @@ export function UiProvider({ children }: { children: React.ReactNode }) {
             <div className={cn("h-1 w-full", 
               config.variant === 'error' ? 'bg-red-500' :
               config.variant === 'success' ? 'bg-green-500' :
+              config.variant === 'warning' ? 'bg-amber-500' :
               'bg-blue-500'
             )} />
 

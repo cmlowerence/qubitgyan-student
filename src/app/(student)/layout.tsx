@@ -3,16 +3,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Sidebar } from '@/components/student/sidebar';
-import { Bell, Menu, Search, X } from 'lucide-react';
+import { Menu, Search, X } from 'lucide-react';
 import { Logo } from '@/components/ui/logo';
 import { cn } from '@/lib/utils';
 import { getProgressSummary, getSearchNodes, SearchNode } from '@/lib/learning';
+import { NotificationCenter, NotificationItem } from '@/components/student/notification-center';
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [searchNodes, setSearchNodes] = useState<SearchNode[]>([]);
-  const [openNotif, setOpenNotif] = useState(false);
   const [recentCount, setRecentCount] = useState(0);
 
   useEffect(() => {
@@ -25,6 +25,25 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     if (!normalized) return [];
     return searchNodes.filter((node) => node.name.toLowerCase().includes(normalized)).slice(0, 7);
   }, [query, searchNodes]);
+
+  const notifications = useMemo<NotificationItem[]>(() => {
+    const feed: NotificationItem[] = [
+      {
+        id: `recent-${recentCount}`,
+        title: recentCount > 0 ? 'Great progress 🎉' : 'Your learning feed',
+        description: recentCount > 0 ? `You completed ${recentCount} resources recently. Keep the streak alive.` : 'Complete one resource to start getting progress updates.',
+        createdAt: 'Today',
+      },
+      {
+        id: 'tip-search',
+        title: 'Tip: search faster',
+        description: 'Use the search bar to jump directly to lessons, sections, and topics.',
+        createdAt: 'Just now',
+      },
+    ];
+
+    return feed;
+  }, [recentCount]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#dbeafe,transparent_45%),linear-gradient(to_bottom,#f8fafc,#eef2ff)]">
@@ -86,20 +105,11 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
               )}
             </div>
 
-            <div className="relative">
-              <button onClick={() => setOpenNotif((value) => !value)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-600 relative">
-                <Bell className="w-5 h-5" />
-                {recentCount > 0 && <span className="absolute -top-1 -right-1 rounded-full bg-rose-500 text-white text-[10px] w-4 h-4 grid place-items-center">{recentCount}</span>}
-              </button>
-              {openNotif && (
-                <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-lg p-3">
-                  <p className="text-sm font-bold text-slate-900">Notifications</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {recentCount > 0 ? `You completed ${recentCount} resources recently. Keep going!` : 'No fresh notifications yet.'}
-                  </p>
-                </div>
-              )}
-            </div>
+            <NotificationCenter items={notifications} />
+          </div>
+
+          <div className="lg:hidden flex justify-end mb-3">
+            <NotificationCenter items={notifications} />
           </div>
           {children}
         </div>
