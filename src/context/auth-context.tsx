@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 2. Protect Routes (Security Guard)
 useEffect(() => {
-    const publicPaths = ['/login', '/register', '/forgot-password', '/suspended'];
+    const publicPaths = ['/login', '/register', '/forgot-password', '/suspended', '/admissionn', '/admissionn/success'];
     
     if (!isLoading) {
       if (user?.is_suspended && pathname !== '/suspended') {

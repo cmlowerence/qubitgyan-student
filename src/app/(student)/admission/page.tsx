@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { SendHorizontal, Loader2, GraduationCap } from 'lucide-react';
 import { useUi } from '@/components/providers/ui-provider';
 import api from '@/lib/api';
+import { useRouter } from 'next/navigation';
 
 interface AdmissionFormState {
   firstName: string;
@@ -35,9 +36,9 @@ const initialState: AdmissionFormState = {
 
 export default function AdmissionPage() {
   const { showAlert } = useUi();
+  const router = useRouter();
   const [form, setForm] = useState<AdmissionFormState>(initialState);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
 
   const handleChange = <K extends keyof AdmissionFormState>(key: K, value: AdmissionFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -48,8 +49,6 @@ export default function AdmissionPage() {
     setIsSubmitting(true);
 
     try {
-      // Package extra details into the learning_goal if the backend only has limited fields,
-      // but we explicitly send first_name and last_name as requested.
       const payload = {
         student_name: `${form.firstName} ${form.lastName}`.trim(),
         first_name: form.firstName,
@@ -62,19 +61,9 @@ export default function AdmissionPage() {
 
       await api.post('/public/admissions/', payload);
 
-      setSubmitted(true);
-      await showAlert({
-        title: 'Application Received!',
-        message: 'Your admission request has been submitted successfully. An admin will review it and contact you shortly.',
-        variant: 'success'
-      });
-      
-      // Optionally reset form
-      // setForm(initialState);
-      
+      router.push('/admission/success');
     } catch (err: any) {
       console.error('Admission API error', err);
-      // Surface Django's throttle error if they submit too many times (e.g., 5/day limit)
       const errorMsg = err.response?.data?.detail || 'Failed to submit your application. Please try again later.';
       
       await showAlert({
@@ -86,29 +75,6 @@ export default function AdmissionPage() {
       setIsSubmitting(false);
     }
   };
-
-  if (submitted) {
-    return (
-      <div className="max-w-3xl mx-auto pb-10 mt-10">
-        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-12 text-center shadow-sm">
-          <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <GraduationCap className="w-10 h-10" />
-          </div>
-          <h2 className="text-3xl font-black text-slate-900 mb-4">Application Received!</h2>
-          <p className="text-slate-600 text-lg max-w-md mx-auto mb-8">
-            Thank you, {form.firstName}. Your admission request is currently under review. We will reach out to you at <span className="font-bold">{form.email}</span> soon.
-          </p>
-          <button 
-            onClick={() => setSubmitted(false)}
-            className="text-emerald-700 font-bold hover:text-emerald-800 transition-colors"
-          >
-            Submit another application
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-4xl mx-auto pb-10">
       <section className="rounded-3xl border border-slate-200 bg-white p-6 lg:p-10 shadow-sm relative overflow-hidden">
