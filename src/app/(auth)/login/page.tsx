@@ -84,7 +84,7 @@ export default function LoginPage() {
       </form>
 
       <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-        <Link href="/register" className="group flex items-center justify-center gap-2 w-full text-sm text-slate-500 hover:text-blue-600 transition-colors">
+        <Link href="/admission" className="group flex items-center justify-center gap-2 w-full text-sm text-slate-500 hover:text-blue-600 transition-colors">
           <span>Don't have an account?</span>
           <span className="font-semibold underline underline-offset-2 decoration-transparent group-hover:decoration-blue-600 transition-all flex items-center gap-1">
             Enroll Here <UserPlus className="w-4 h-4" />
