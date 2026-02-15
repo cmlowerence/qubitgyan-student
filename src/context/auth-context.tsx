@@ -26,7 +26,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       const token = localStorage.getItem('access_token');
       
-      // If no token, stop loading and let the page decide if it needs to redirect
       if (!token) {
         setIsLoading(false);
         return;
@@ -57,7 +56,7 @@ useEffect(() => {
       if (user?.is_suspended && pathname !== '/suspended') {
         router.push('/suspended');
       } 
-      else if (!user && !publicPaths.includes(pathname)) {
+      else if (!user && !publicPaths.some(path => pathname.startsWith(path))) {
         router.push('/login');
       } 
       else if (user && !user.is_suspended && publicPaths.includes(pathname)) {

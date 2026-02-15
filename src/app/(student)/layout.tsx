@@ -9,9 +9,12 @@ import { cn } from '@/lib/utils';
 import { getProgressSummary, searchGlobal, SearchNode, getNotifications } from '@/lib/learning';
 import { NotificationCenter, NotificationItem } from '@/components/student/notification-center';
 import { useGamificationHeartbeat } from '@/hooks/use-gamification';
+import { useAuth } from '@/context/auth-context';
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   useGamificationHeartbeat();
+
+  const { user } = useAuth();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [recentCount, setRecentCount] = useState(0);
@@ -23,9 +26,11 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    getProgressSummary().then((summary) => setRecentCount(summary.recent.length));
-    getNotifications().then(setApiNotifications);
-  }, []);
+    if (user) {
+      getProgressSummary().then((summary) => setRecentCount(summary.recent.length));
+      getNotifications().then(setApiNotifications);
+    }
+  }, [user]);
 
   useEffect(() => {
     const trimmed = query.trim();
