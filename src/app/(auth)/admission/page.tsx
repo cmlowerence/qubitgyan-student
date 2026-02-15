@@ -47,6 +47,13 @@ export default function AdmissionPage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsSubmitting(true);
+    const bridgeData = [
+        `Exam: ${form.targetExam}`,
+        `Mode: ${form.preferredMode}`,
+        `Guardian: ${form.guardianName} (${form.guardianPhone})`,
+        `Address: ${form.address}`,
+        `Notes: ${form.notes || 'None'}`
+      ].join(' | ');
 
     try {
       const payload = {
@@ -56,7 +63,7 @@ export default function AdmissionPage() {
         email: form.email,
         phone: form.phone,
         class_grade: form.grade,
-        learning_goal: `Exam: ${form.targetExam} | Mode: ${form.preferredMode} | Notes: ${form.notes}`,
+        learning_goal: bridgeData,
       };
 
       await api.post('/public/admissions/', payload);
