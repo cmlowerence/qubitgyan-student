@@ -89,27 +89,29 @@ export default function AdmissionPage() {
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-50 via-white to-slate-50 relative overflow-hidden">
       
       {/* Decorative Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-[500px] bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] pointer-events-none" />
+      <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.02] pointer-events-none" />
       <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-violet-400/20 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-cyan-400/20 blur-[150px] pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-4 py-12 sm:py-20 lg:py-24 relative z-10 flex flex-col lg:flex-row gap-12 xl:gap-20 items-start">
+      {/* CHANGED: Replaced flex with strict CSS Grid to prevent squishing */}
+      <div className="max-w-[1400px] mx-auto px-4 py-8 sm:py-16 lg:py-20 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
         
         {/* Left Column: Hero & Value Proposition */}
-        <div className="w-full lg:w-5/12 lg:sticky lg:top-12 space-y-8 animate-in slide-in-from-left-8 duration-700 fade-in">
+        <div className="w-full lg:col-span-5 lg:sticky lg:top-12 space-y-8 animate-in slide-in-from-left-8 duration-700 fade-in">
           <div>
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-white shadow-xl shadow-violet-900/10 mb-8 border border-slate-100">
-              <GraduationCap className="w-8 h-8 text-violet-600" />
+            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-white shadow-xl shadow-violet-900/10 mb-6 sm:mb-8 border border-slate-100">
+              <GraduationCap className="w-7 h-7 sm:w-8 sm:h-8 text-violet-600" />
             </div>
-            <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight leading-[1.1]">
+            {/* CHANGED: Dialed down mobile text sizes */}
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
               Start your journey with <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-cyan-500">QubitGyan</span>
             </h1>
-            <p className="mt-6 text-lg text-slate-600 leading-relaxed max-w-md">
+            <p className="mt-4 sm:mt-6 text-base sm:text-lg text-slate-600 leading-relaxed max-w-lg">
               Submit your admission request today. Our academic team will review your profile to ensure you get the absolute best learning experience.
             </p>
           </div>
 
-          <div className="space-y-5 pt-6">
+          <div className="space-y-4 pt-4 sm:pt-6">
             <FeatureItem title="Expert Curriculum" desc="Structured learning paths designed for real results." />
             <FeatureItem title="Personalized Tracking" desc="Monitor your streak, progress, and performance." />
             <FeatureItem title="Flexible Learning Mode" desc="Choose between Online, Offline, or Hybrid classes." />
@@ -117,18 +119,18 @@ export default function AdmissionPage() {
         </div>
 
         {/* Right Column: The Form Card */}
-        <div className="w-full lg:w-7/12 animate-in slide-in-from-right-8 duration-700 fade-in delay-150">
-          <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] border border-white shadow-2xl shadow-slate-200/50 p-6 sm:p-10 xl:p-12 relative">
+        <div className="w-full lg:col-span-7 animate-in slide-in-from-right-8 duration-700 fade-in delay-150">
+          <div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] sm:rounded-[2.5rem] border border-white shadow-2xl shadow-slate-200/50 p-5 sm:p-8 lg:p-10 relative">
             
-            <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
+            <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-x-5 gap-y-5 sm:gap-y-6">
               
               {/* --- SECTION: Student Details --- */}
-              <div className="sm:col-span-2 flex items-center gap-3 border-b border-slate-100 pb-3 mb-2">
+              <div className="sm:col-span-2 flex items-center gap-3 border-b border-slate-100 pb-3 mb-1">
                 <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600 shrink-0">
                   <User className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 leading-tight">Student Profile</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">Student Profile</h2>
                   <p className="text-xs text-slate-500 font-medium">Basic applicant information</p>
                 </div>
               </div>
@@ -139,12 +141,12 @@ export default function AdmissionPage() {
               <Field label="Phone Number" type="tel" value={form.phone} onChange={(value) => handleChange('phone', value)} placeholder="+91 98765 43210" required />
 
               {/* --- SECTION: Academic Info --- */}
-              <div className="sm:col-span-2 flex items-center gap-3 border-b border-slate-100 pb-3 mb-2 mt-4">
+              <div className="sm:col-span-2 flex items-center gap-3 border-b border-slate-100 pb-3 mb-1 mt-3">
                 <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center text-cyan-600 shrink-0">
                   <BookOpen className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 leading-tight">Academic Goals</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">Academic Goals</h2>
                   <p className="text-xs text-slate-500 font-medium">What are you preparing for?</p>
                 </div>
               </div>
@@ -152,11 +154,11 @@ export default function AdmissionPage() {
               <Field label="Current Grade / Class" value={form.grade} onChange={(value) => handleChange('grade', value)} placeholder="e.g. 12th Grade" required />
               <Field label="Target Exam" value={form.targetExam} onChange={(value) => handleChange('targetExam', value)} placeholder="e.g. JEE, NEET, Boards" required />
               
-              <label className="space-y-2 sm:col-span-2">
-                <span className="text-sm font-bold text-slate-700 flex items-center gap-1">Preferred Learning Mode <span className="text-rose-500">*</span></span>
+              <label className="space-y-1.5 sm:col-span-2">
+                <span className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1">Preferred Learning Mode <span className="text-rose-500">*</span></span>
                 <div className="relative group">
                   <select
-                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 outline-none focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-medium text-slate-700"
+                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 sm:py-3.5 outline-none focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-medium text-sm sm:text-base text-slate-700"
                     value={form.preferredMode}
                     onChange={(event) => handleChange('preferredMode', event.target.value as AdmissionFormState['preferredMode'])}
                   >
@@ -171,12 +173,12 @@ export default function AdmissionPage() {
               </label>
 
               {/* --- SECTION: Guardian & Address --- */}
-              <div className="sm:col-span-2 flex items-center gap-3 border-b border-slate-100 pb-3 mb-2 mt-4">
+              <div className="sm:col-span-2 flex items-center gap-3 border-b border-slate-100 pb-3 mb-1 mt-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 leading-tight">Contact & Guardian</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">Contact & Guardian</h2>
                   <p className="text-xs text-slate-500 font-medium">Additional contact details</p>
                 </div>
               </div>
@@ -184,10 +186,10 @@ export default function AdmissionPage() {
               <Field label="Guardian Name" value={form.guardianName} onChange={(value) => handleChange('guardianName', value)} placeholder="Parent/Guardian Name" required />
               <Field label="Guardian Phone" type="tel" value={form.guardianPhone} onChange={(value) => handleChange('guardianPhone', value)} placeholder="Emergency Contact" required />
 
-              <label className="space-y-2 sm:col-span-2">
-                <span className="text-sm font-bold text-slate-700 flex items-center gap-1">Full Address <span className="text-rose-500">*</span></span>
+              <label className="space-y-1.5 sm:col-span-2">
+                <span className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1">Full Address <span className="text-rose-500">*</span></span>
                 <textarea
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 min-h-[100px] outline-none focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all resize-y font-medium text-slate-900 placeholder:text-slate-400"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 sm:py-3.5 min-h-[100px] outline-none focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all resize-y font-medium text-sm sm:text-base text-slate-900 placeholder:text-slate-400"
                   value={form.address}
                   onChange={(event) => handleChange('address', event.target.value)}
                   placeholder="Enter your complete residential address..."
@@ -195,10 +197,10 @@ export default function AdmissionPage() {
                 />
               </label>
 
-              <label className="space-y-2 sm:col-span-2">
-                <span className="text-sm font-bold text-slate-700 flex items-center gap-1">Additional Notes <span className="text-slate-400 font-normal">(Optional)</span></span>
+              <label className="space-y-1.5 sm:col-span-2">
+                <span className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1">Additional Notes <span className="text-slate-400 font-normal">(Optional)</span></span>
                 <textarea
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 min-h-[100px] outline-none focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all resize-y font-medium text-slate-900 placeholder:text-slate-400"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 sm:py-3.5 min-h-[80px] outline-none focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all resize-y font-medium text-sm sm:text-base text-slate-900 placeholder:text-slate-400"
                   value={form.notes}
                   onChange={(event) => handleChange('notes', event.target.value)}
                   placeholder="Learning preferences, specific timing constraints, or anything else we should know..."
@@ -206,11 +208,11 @@ export default function AdmissionPage() {
               </label>
 
               {/* --- Submit Button --- */}
-              <div className="sm:col-span-2 mt-6 pt-6 border-t border-slate-100">
+              <div className="sm:col-span-2 mt-4 pt-6 border-t border-slate-100">
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="w-full flex items-center justify-center gap-3 rounded-2xl bg-slate-900 text-white font-bold py-4 hover:bg-violet-600 transition-all disabled:opacity-70 shadow-xl shadow-slate-900/10 hover:-translate-y-0.5"
+                  className="w-full flex items-center justify-center gap-3 rounded-2xl bg-slate-900 text-white font-bold py-3.5 sm:py-4 hover:bg-violet-600 transition-all disabled:opacity-70 shadow-xl shadow-slate-900/10 hover:-translate-y-0.5"
                 >
                   {isSubmitting ? (
                     <><Loader2 className="w-5 h-5 animate-spin" /> Processing Application...</>
@@ -238,10 +240,10 @@ function FeatureItem({ title, desc }: { title: string; desc: string }) {
   return (
     <div className="flex items-start gap-3">
       <div className="mt-1">
-        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+        <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
       </div>
       <div>
-        <h3 className="font-bold text-slate-900">{title}</h3>
+        <h3 className="text-base sm:text-lg font-bold text-slate-900">{title}</h3>
         <p className="text-sm text-slate-600 mt-0.5">{desc}</p>
       </div>
     </div>
@@ -264,8 +266,8 @@ function Field({
   required?: boolean;
 }) {
   return (
-    <label className="space-y-2">
-      <span className="text-sm font-bold text-slate-700 flex items-center gap-1">
+    <label className="space-y-1.5">
+      <span className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1">
         {label} {required && <span className="text-rose-500">*</span>}
       </span>
       <input
@@ -273,7 +275,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3.5 outline-none focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-medium text-slate-900 placeholder:text-slate-400"
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 sm:py-3.5 outline-none focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-medium text-sm sm:text-base text-slate-900 placeholder:text-slate-400"
         required={required}
       />
     </label>
