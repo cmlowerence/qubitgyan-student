@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Resource } from '@/types';
 import { AlertCircle, CheckCircle, ExternalLink, FileText, PlayCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useUi } from '@/components/providers/ui-provider';
+import { saveResumeTimestamp } from '@/lib/learning';
 
 interface ContentViewerProps {
   resource: Resource | null;
@@ -59,9 +60,85 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
   const [iframeError, setIframeError] = useState(false);
   const embedUrl = useMemo(() => (resource ? toEmbedUrl(resource) : null), [resource]);
 
+  // Refs used for video resume / throttled server saves
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const lastServerSaveRef = useRef<number>(0);
+
   useEffect(() => {
     setIsCompleted(Boolean(resource?.is_completed));
     setIframeError(false);
+
+    // If there is a saved resume timestamp locally, attempt to restore for HTML5 videos
+    try {
+      if (resource && resource.resource_type === 'VIDEO') {
+        const key = `resume_${resource.id}`;
+        const raw = localStorage.getItem(key);
+        const saved = raw ? Number(raw) : 0;
+        const el = videoRef.current;
+        if (el && saved > 0) {
+          const setIfReady = () => {
+            try {
+              if (!isNaN(el.duration) && el.duration > 0) {
+                el.currentTime = Math.min(saved, el.duration - 0.1);
+              } else {
+                el.currentTime = saved;
+              }
+            } catch {}
+          };
+
+          if (el.readyState >= 1) setIfReady();
+          else el.addEventListener('loadedmetadata', setIfReady, { once: true });
+        }
+      }
+    } catch (err) {
+      /* ignore localStorage failures */
+    }
+  }, [resource]);
+
+  // Attach listeners to HTML5 <video> to save resume position periodically
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !resource) return;
+
+    const key = `resume_${resource.id}`;
+
+    const onTimeUpdate = () => {
+      const t = Math.floor(el.currentTime || 0);
+      try {
+        localStorage.setItem(key, String(t));
+      } catch {}
+
+      const now = Date.now();
+      // throttle server saves to once every 5s
+      if (now - lastServerSaveRef.current > 5000) {
+        lastServerSaveRef.current = now;
+        saveResumeTimestamp(resource.id, t);
+      }
+    };
+
+    const onPause = () => {
+      const t = Math.floor(el.currentTime || 0);
+      try {
+        localStorage.setItem(key, String(t));
+      } catch {}
+      saveResumeTimestamp(resource.id, t);
+    };
+
+    el.addEventListener('timeupdate', onTimeUpdate);
+    el.addEventListener('pause', onPause);
+
+    const onBeforeUnload = () => {
+      try {
+        localStorage.setItem(key, String(Math.floor(el.currentTime || 0)));
+      } catch {}
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    return () => {
+      el.removeEventListener('timeupdate', onTimeUpdate);
+      el.removeEventListener('pause', onPause);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
   }, [resource]);
 
   const handleMarkComplete = async () => {
@@ -71,6 +148,13 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
       await api.post('/progress/', { resource: resource.id, is_completed: true, node: nodeId });
       setIsCompleted(true);
       onComplete?.();
+
+      // clear client-side resume and inform server that resume is reset
+      try {
+        localStorage.removeItem(`resume_${resource.id}`);
+        await saveResumeTimestamp(resource.id, 0);
+      } catch {}
+
       await showAlert({
         title: 'Progress saved',
         message: 'Great work! This resource has been marked as completed.',
@@ -123,7 +207,7 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
               )}
             </div>
           ) : isPlayableVideo(embedUrl) ? (
-            <video controls playsInline className="w-full max-h-[72vh] bg-black">
+            <video ref={videoRef} controls playsInline className="w-full max-h-[72vh] bg-black">
               <source src={embedUrl} />
               Your browser does not support the video tag.
             </video>

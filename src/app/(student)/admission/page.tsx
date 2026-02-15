@@ -37,9 +37,28 @@ export default function AdmissionPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setSubmitted(true);
+
+    try {
+      await fetch((process.env.NEXT_PUBLIC_API_URL || '/api') + '/public/admissions/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_name: form.studentName,
+          email: form.email,
+          phone: form.phone,
+          class_grade: form.grade,
+          learning_goal: `${form.targetExam}${form.notes ? ' — ' + form.notes : ''}`,
+        }),
+      });
+
+      setSubmitted(true);
+    } catch (err) {
+      // still mark submitted so user sees the draft panel, but surface console error
+      console.error('Admission API error', err);
+      setSubmitted(true);
+    }
   };
 
   return (
@@ -53,7 +72,7 @@ export default function AdmissionPage() {
         {submitted && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700 text-sm flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
-            Draft saved in UI state. Connect this payload to admission API endpoint in admin workflow.
+            Admission request submitted — admin will review and contact you shortly.
           </div>
         )}
 

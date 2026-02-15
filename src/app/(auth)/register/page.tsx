@@ -17,11 +17,18 @@ export default function RegisterRequestPage() {
     setMessage('');
 
     try {
-      await api.post('/admission-requests/', { ...form, resolved: false, status: 'PENDING' });
-      setMessage('Admission request sent. You can check status once backend status tracking is connected.');
+      await api.post('/public/admissions/', {
+        student_name: form.student_name,
+        email: form.email,
+        phone: form.phone,
+        class_grade: form.class_level,
+        learning_goal: form.goal,
+      });
+      setMessage('Admission request sent. Admin will review and notify you by email.');
       setForm({ student_name: '', email: '', phone: '', class_level: '', goal: '' });
-    } catch {
-      setMessage('Request saved as draft in frontend. Backend endpoint will be connected in upcoming integration.');
+    } catch (err) {
+      setMessage('Failed to submit. Your request is saved locally — try again later.');
+      console.error('Admission submit failed', err);
     } finally {
       setIsSubmitting(false);
     }

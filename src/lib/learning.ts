@@ -197,4 +197,22 @@ export async function getProgressSummary() {
   }
 }
 
+/**
+ * Save resume timestamp for a resource (server + localStorage fallback)
+ */
+export async function saveResumeTimestamp(resourceId: number, seconds: number) {
+  // save locally first so UI can restore immediately
+  try {
+    localStorage.setItem(`resume_${resourceId}`, String(Math.floor(seconds)));
+  } catch {}
+
+  // attempt server save (no hard failure for user)
+  try {
+    await api.post('/public/tracking/save_timestamp/', { resource_id: resourceId, resume_timestamp: Math.floor(seconds) });
+  } catch (err) {
+    // silent - we'll keep local copy
+    console.debug('saveResumeTimestamp failed', err);
+  }
+}
+
 export type { SearchNode };

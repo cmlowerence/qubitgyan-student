@@ -55,3 +55,22 @@ export interface StudentProgress {
   is_completed: boolean;
   last_accessed: string; // ISO Date string
 }
+
+// --- COURSES & ENROLLMENT ---
+export interface Course {
+  id: number;
+  title: string;
+  description?: string;
+  thumbnail_url?: string;
+  is_published?: boolean;
+  root_node_name?: string;
+  created_at?: string;
+  is_enrolled?: boolean;
+}
+
+export interface Enrollment {
+  id: number;
+  course: number;
+  course_details?: Course;
+  enrolled_at?: string;
+}
