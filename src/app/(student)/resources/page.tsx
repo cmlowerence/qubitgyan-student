@@ -1,51 +1,127 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { getChildren, getDomains } from '@/lib/learning';
-import { KnowledgeNode } from '@/types';
-import { FileSearch, FolderOpen } from 'lucide-react';
+import { getBookmarks, removeBookmark } from '@/lib/learning';
+import { BookmarkMinus, PlayCircle, FileText, FileQuestion, Link as LinkIcon, Loader2, Bookmark } from 'lucide-react';
+import { useUi } from '@/components/providers/ui-provider';
 
-export default function ResourcesPage() {
-  const [tracks, setDomains] = useState<KnowledgeNode[]>([]);
-
-  useEffect(() => {
-    getDomains().then(setDomains);
-  }, []);
-
-  return (
-    <div className="space-y-5 pb-10">
-      <section className="rounded-3xl bg-gradient-to-r from-cyan-600 to-blue-700 text-white p-4 sm:p-6">
-        <h1 className="text-2xl sm:text-3xl font-black">Resource Hub</h1>
-        <p className="text-cyan-100 mt-2">Access notes, videos, and guides from one clean library interface.</p>
-      </section>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {tracks.map((domain) => (
-          <DomainResourceCard key={domain.id} domain={domain} />
-        ))}
-      </div>
-    </div>
-  );
+interface BookmarkData {
+  id: number;
+  resource: number;
+  resource_title: string;
+  resource_type: string;
+  created_at: string;
 }
 
-function DomainResourceCard({ domain }: { domain: KnowledgeNode }) {
-  const [subjectCount, setSubjectCount] = useState(0);
+export default function SavedResourcesPage() {
+  const { showAlert, showConfirm } = useUi();
+  const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    getChildren(domain.id).then((subjects) => setSubjectCount(subjects.length));
-  }, [domain.id]);
+    const fetchBookmarks = async () => {
+      const data = await getBookmarks();
+      setBookmarks(data);
+      setIsLoading(false);
+    };
+    fetchBookmarks();
+  }, []);
+
+  const handleRemove = async (id: number) => {
+    const confirmed = await showConfirm({
+      title: 'Remove Bookmark?',
+      message: 'Are you sure you want to remove this from your saved resources?',
+      confirmText: 'Remove',
+      variant: 'warning'
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await removeBookmark(id);
+      setBookmarks(prev => prev.filter(b => b.id !== id));
+      showAlert({ title: 'Removed', message: 'Bookmark removed successfully.', variant: 'success' });
+    } catch (error) {
+      showAlert({ title: 'Error', message: 'Could not remove bookmark.', variant: 'error' });
+    }
+  };
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'VIDEO': return <PlayCircle className="w-6 h-6 text-rose-500" />;
+      case 'PDF': return <FileText className="w-6 h-6 text-blue-500" />;
+      case 'QUIZ': return <FileQuestion className="w-6 h-6 text-violet-500" />;
+      default: return <LinkIcon className="w-6 h-6 text-slate-500" />;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-slate-500">
+        <Loader2 className="w-10 h-10 animate-spin text-violet-600 mb-4" />
+        <p className="font-semibold text-lg">Loading your library...</p>
+      </div>
+    );
+  }
 
   return (
-    <Link href={`/courses/${domain.id}`} className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 hover:shadow-xl transition-all active:scale-[0.99]">
-      <div className="flex items-center justify-between">
-        <div className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center">
-          <FolderOpen className="w-5 h-5" />
-        </div>
-        <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded-full">{subjectCount} subjects</span>
+    <div className="max-w-6xl mx-auto pb-10">
+      <div className="mb-8">
+        <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
+          <Bookmark className="w-8 h-8 text-amber-500 fill-amber-500/20" /> 
+          Saved Resources
+        </h1>
+        <p className="text-slate-500 mt-2 text-lg">Quick access to the materials you've bookmarked for later review.</p>
       </div>
-      <h2 className="text-lg sm:text-xl font-bold mt-3 text-slate-900 break-words">{domain.name}</h2>
-      <p className="text-sm text-slate-500 mt-2 flex items-center gap-2"><FileSearch className="w-4 h-4" />Open resource explorer</p>
-    </Link>
+
+      {bookmarks.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-16 text-center">
+          <Bookmark className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold text-slate-900">Your library is empty</h3>
+          <p className="text-slate-500 mt-2 max-w-sm mx-auto">
+            When you find a video, PDF, or quiz you want to keep handy, click the "Save for later" button to bookmark it here.
+          </p>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {bookmarks.map((bookmark) => {
+            const date = new Date(bookmark.created_at).toLocaleDateString(undefined, { 
+              month: 'short', day: 'numeric', year: 'numeric' 
+            });
+
+            return (
+              <div key={bookmark.id} className="group rounded-3xl border border-slate-200 bg-white p-5 flex flex-col hover:shadow-xl hover:shadow-violet-900/5 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
+                <div className="flex items-start justify-between mb-4 relative z-10">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 shadow-sm">
+                    {getIcon(bookmark.resource_type)}
+                  </div>
+                  <button 
+                    onClick={() => handleRemove(bookmark.id)}
+                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                    title="Remove bookmark"
+                  >
+                    <BookmarkMinus className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="flex-1 relative z-10">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{bookmark.resource_type}</p>
+                  <h3 className="text-lg font-bold text-slate-900 leading-tight mb-4 group-hover:text-violet-700 transition-colors">
+                    {bookmark.resource_title}
+                  </h3>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-medium text-slate-500 relative z-10">
+                  <span>Saved on {date}</span>
+                </div>
+
+                {/* Decorative background accent */}
+                <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-slate-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity z-0 pointer-events-none" />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

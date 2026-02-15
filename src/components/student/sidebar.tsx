@@ -9,7 +9,7 @@ import { useAuth } from '@/context/auth-context';
 import { useUi } from '@/components/providers/ui-provider';
 import { LogOut, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { getProgressSummary } from '@/lib/learning';
+import { getMyProfile } from '@/lib/learning';
 
 interface SidebarProps {
   className?: string;
@@ -22,8 +22,15 @@ export function Sidebar({ className, onClose }: SidebarProps) {
   const { showConfirm } = useUi();
   const [streak, setStreak] = useState(0);
 
+  // Fetch the real gamification streak from the backend
   useEffect(() => {
-    getProgressSummary().then((summary) => setStreak(summary.streakDays));
+    const fetchStreak = async () => {
+      const profile = await getMyProfile();
+      if (profile) {
+        setStreak(profile.current_streak);
+      }
+    };
+    fetchStreak();
   }, []);
 
   const handleLogout = async () => {
@@ -31,7 +38,7 @@ export function Sidebar({ className, onClose }: SidebarProps) {
       title: 'Log out?',
       message: 'Are you sure you want to sign out?',
       confirmText: 'Log out',
-      variant: 'warning',
+      variant: 'info', // Using 'info' to match your updated UI Provider types
     });
 
     if (confirmed) logout();
@@ -83,8 +90,13 @@ export function Sidebar({ className, onClose }: SidebarProps) {
 
       <div className="p-4 border-t border-slate-800">
         <div className="bg-slate-900/80 rounded-2xl p-3 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center text-white font-bold shrink-0">
-            {user?.first_name?.charAt(0) || 'S'}
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center text-white font-bold shrink-0 overflow-hidden">
+             {/* If they have an avatar, show it here too! Otherwise, initials. */}
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              user?.first_name?.charAt(0) || 'S'
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-white truncate">{user?.first_name || 'Student'}</p>

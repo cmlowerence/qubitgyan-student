@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ComponentType, useEffect, useState } from 'react';
 import { useAuth } from '@/context/auth-context';
-import { getChildren, getDomains, getProgressSummary } from '@/lib/learning';
+import { getChildren, getDomains, getProgressSummary, getMyProfile } from '@/lib/learning';
 import { KnowledgeNode } from '@/types';
 import { ArrowRight, BookOpen, Flame, Layers, Trophy } from 'lucide-react';
 
@@ -16,13 +16,21 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const load = async () => {
+      // 1. Load Tracks & Subjects
       const loadedTracks = await getDomains();
       setTracks(loadedTracks);
       const entries = await Promise.all(loadedTracks.map(async (track) => [track.id, (await getChildren(track.id)).length] as const));
       setCounts(Object.fromEntries(entries));
+      
+      // 2. Load Completed Resources Count
       const progress = await getProgressSummary();
-      setStreak(progress.streakDays);
       setCompletedCount(progress.completedCount);
+
+      // 3. Load Real Gamification Streak from Backend
+      const profile = await getMyProfile();
+      if (profile) {
+        setStreak(profile.current_streak);
+      }
     };
     load();
   }, []);

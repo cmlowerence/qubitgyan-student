@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Resource } from '@/types';
-import { AlertCircle, CheckCircle, ExternalLink, FileText, PlayCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, ExternalLink, FileText, PlayCircle, Bookmark, BookmarkCheck } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useUi } from '@/components/providers/ui-provider';
-import { saveResumeTimestamp } from '@/lib/learning';
+import { saveResumeTimestamp, getBookmarks, addBookmark, removeBookmark } from '@/lib/learning';
+import { QuizViewer } from '@/components/student/quiz-viewer';
 
 interface ContentViewerProps {
   resource: Resource | null;
@@ -60,6 +61,10 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
   const [iframeError, setIframeError] = useState(false);
   const embedUrl = useMemo(() => (resource ? toEmbedUrl(resource) : null), [resource]);
 
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkId, setBookmarkId] = useState<number | null>(null);
+  const [isBookmarking, setIsBookmarking] = useState(false);
+
   // Refs used for video resume / throttled server saves
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastServerSaveRef = useRef<number>(0);
@@ -68,6 +73,23 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
     setIsCompleted(Boolean(resource?.is_completed));
     setIframeError(false);
 
+    const checkBookmark = async () => {
+      if (!resource) return;
+      try {
+        const bookmarks = await getBookmarks();
+        const existing = bookmarks.find((b: any) => b.resource === resource.id);
+        if (existing) {
+          setIsBookmarked(true);
+          setBookmarkId(existing.id);
+        } else {
+          setIsBookmarked(false);
+          setBookmarkId(null);
+        }
+      } catch (error) {
+        console.error("Failed to check bookmark status", error);
+      }
+    };
+    checkBookmark();
     // If there is a saved resume timestamp locally, attempt to restore for HTML5 videos
     try {
       if (resource && resource.resource_type === 'VIDEO') {
@@ -141,6 +163,28 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
     };
   }, [resource]);
 
+  const handleToggleBookmark = async () => {
+    if (!resource) return;
+    setIsBookmarking(true);
+    try {
+      if (isBookmarked && bookmarkId) {
+        await removeBookmark(bookmarkId);
+        setIsBookmarked(false);
+        setBookmarkId(null);
+        showAlert({ title: 'Removed', message: 'Resource removed from your saved items.', variant: 'info' });
+      } else {
+        const newBookmark = await addBookmark(resource.id);
+        setIsBookmarked(true);
+        setBookmarkId(newBookmark.id);
+        showAlert({ title: 'Saved!', message: 'Resource added to your bookmarks.', variant: 'success' });
+      }
+    } catch (error) {
+      showAlert({ title: 'Error', message: 'Failed to update bookmark.', variant: 'error' });
+    } finally {
+      setIsBookmarking(false);
+    }
+  };
+
   const handleMarkComplete = async () => {
     if (!resource) return;
     setIsCompleting(true);
@@ -177,6 +221,7 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
 
   const isPdf = resource.resource_type === 'PDF';
   const isVideo = resource.resource_type === 'VIDEO';
+  const isQuiz = resource.resource_type === 'QUIZ';
 
   return (
     <div className="space-y-4">
@@ -237,6 +282,8 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
         </div>
       ) : null}
 
+      {isQuiz && <QuizViewer resource={resource} onComplete={onComplete} />}
+
       {!isVideo && !isPdf && resource.content_text && <article className="rounded-2xl border border-slate-200 bg-slate-50 p-5 leading-relaxed text-slate-700">{resource.content_text}</article>}
 
       {resource.external_url && !resource.content_text && !isVideo && !isPdf && (
@@ -246,17 +293,33 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
       )}
 
       <div className="flex flex-wrap gap-2">
+        {!isQuiz && (
+          <button
+            onClick={handleMarkComplete}
+            disabled={isCompleting || isCompleted}
+            className={cn('inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all', isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-900 text-white hover:bg-slate-800')}
+          >
+            <CheckCircle className="w-4 h-4" />
+            {isCompleting ? 'Saving...' : isCompleted ? 'Completed' : 'Mark as complete'}
+          </button>
+        )}
+
+        {/* --- THE NEW BOOKMARK BUTTON --- */}
         <button
-          onClick={handleMarkComplete}
-          disabled={isCompleting || isCompleted}
-          className={cn('inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all', isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-900 text-white hover:bg-slate-800')}
+          onClick={handleToggleBookmark}
+          disabled={isBookmarking}
+          className={cn('inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all border', 
+            isBookmarked 
+              ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' 
+              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+          )}
         >
-          <CheckCircle className="w-4 h-4" />
-          {isCompleting ? 'Saving...' : isCompleted ? 'Completed' : 'Mark as complete'}
+          {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+          {isBookmarked ? 'Saved to Bookmarks' : 'Save for later'}
         </button>
 
-        {resource.external_url && (
-          <a href={resource.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+        {resource.external_url && !isQuiz && (
+          <a href={resource.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50">
             {resource.resource_type === 'VIDEO' ? <PlayCircle className="w-4 h-4" /> : <FileText className="w-4 h-4" />} Open original
           </a>
         )}

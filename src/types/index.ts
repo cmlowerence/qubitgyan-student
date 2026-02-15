@@ -30,7 +30,7 @@ export interface KnowledgeNode {
 export interface Resource {
   id: number;
   title: string;
-  resource_type: 'VIDEO' | 'PDF' | 'ARTICLE' | 'LINK';
+  resource_type: 'VIDEO' | 'PDF' | 'ARTICLE' | 'LINK' | 'QUIZ'; // Added 'QUIZ' as a new type
   node: number;
   node_name?: string; // ReadOnly field from serializer
   

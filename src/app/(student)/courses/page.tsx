@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { getCourses, getMyCourses, enrollInCourse } from '@/lib/courses';
+import { getPublishedCourses, getMyCourses, enrollInCourse, getCourseProgress } from '@/lib/learning';
 import { Course } from '@/types';
-import { Compass, Search } from 'lucide-react';
+import { Compass, Search, Loader2 } from 'lucide-react';
 import { useUi } from '@/components/providers/ui-provider';
 import { useAuth } from '@/context/auth-context';
 
@@ -12,117 +12,183 @@ export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [myCourses, setMyCourses] = useState<Course[]>([]);
   const [query, setQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [enrollingId, setEnrollingId] = useState<number | null>(null);
+  
+  // Progress Map: { courseId: { total, completed, percent, rootNodeId } }
+  const [progressMap, setProgressMap] = useState<Record<number, { total: number; completed: number; percent: number; rootNodeId?: number | null }>>({});
+  
   const { showAlert } = useUi();
   const { user } = useAuth();
 
   useEffect(() => {
     const load = async () => {
-      const all = await getCourses();
-      setCourses(all);
+      setIsLoading(true);
+      try {
+        // 1. Fetch published courses (backend includes `is_enrolled` flag)
+        const all = await getPublishedCourses();
+        setCourses(all);
 
-      // fetch enrolled list separately (backend action)
-      const mine = await getMyCourses();
-      setMyCourses(mine);
+        // 2. Fetch enrolled list separately (if needed, though `all` has the flag)
+        const mine = await getMyCourses();
+        setMyCourses(mine);
 
-      // compute per-course progress (parallelized)
-      const progressPromises = all.map(async (c) => {
-        const meta = await getCourseProgress(c);
-        return [c.id, meta] as const;
-      });
+        // 3. Compute per-course progress for ENROLLED courses (to save API calls)
+        const progressPromises = mine.map(async (c) => {
+          const meta = await getCourseProgress(c);
+          return [c.id, meta] as const;
+        });
 
-      const results = await Promise.all(progressPromises);
-      const map = Object.fromEntries(results.map(([id, v]) => [id, v]));
-      setProgressMap(map as Record<number, { total: number; completed: number; percent: number; rootNodeId?: number | null }>);
+        const results = await Promise.all(progressPromises);
+        const map = Object.fromEntries(results.map(([id, v]) => [id, v]));
+        setProgressMap(map as Record<number, { total: number; completed: number; percent: number; rootNodeId?: number | null }>);
+
+      } catch (error) {
+        console.error("Failed to load courses", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    load();
+    
+    if (user) load();
   }, [user]);
 
   const filtered = courses.filter((c) => c.title.toLowerCase().includes(query.toLowerCase()));
 
   const handleEnroll = async (courseId: number) => {
-    const prev = courses.slice();
-    setCourses((s) => s.map((c) => (c.id === courseId ? { ...c, is_enrolled: true } : c)));
-    const res = await enrollInCourse(courseId);
-    if (!res) {
-      setCourses(prev);
-      await showAlert({ title: 'Enrollment failed', message: 'Could not enroll — please try again.', variant: 'error' });
-      return;
-    }
+    setEnrollingId(courseId);
+    try {
+      // Optimistic update
+      setCourses((s) => s.map((c) => (c.id === courseId ? { ...c, is_enrolled: true } : c)));
+      
+      const res = await enrollInCourse(courseId);
+      
+      if (!res) {
+        // Revert on failure
+        setCourses((s) => s.map((c) => (c.id === courseId ? { ...c, is_enrolled: false } : c)));
+        await showAlert({ title: 'Enrollment failed', message: 'Could not enroll — please try again.', variant: 'error' });
+        return;
+      }
 
-    // refresh myCourses
-    const mine = await getMyCourses();
-    setMyCourses(mine);
-    await showAlert({ title: 'Enrolled', message: 'You are now enrolled in this course.', variant: 'success' });
+      // Refresh myCourses to ensure it appears in the top list
+      const mine = await getMyCourses();
+      setMyCourses(mine);
+      
+      // Calculate progress for the newly enrolled course
+      const newlyEnrolled = mine.find(c => c.id === courseId);
+      if (newlyEnrolled) {
+         const meta = await getCourseProgress(newlyEnrolled);
+         setProgressMap(prev => ({...prev, [courseId]: meta}));
+      }
+
+      await showAlert({ title: 'Enrolled', message: 'You are now enrolled in this course.', variant: 'success' });
+    } catch (error) {
+      await showAlert({ title: 'Error', message: 'An unexpected error occurred.', variant: 'error' });
+    } finally {
+      setEnrollingId(null);
+    }
   };
 
+  if (isLoading) {
+    return <div className="p-10 text-center text-slate-500 flex flex-col items-center gap-3"><Loader2 className="w-8 h-8 animate-spin text-violet-600"/> Loading your library...</div>;
+  }
+
   return (
-    <div className="space-y-5 pb-10">
-      <section className="rounded-3xl bg-white border border-slate-200 p-5 lg:p-7">
+    <div className="space-y-8 pb-10">
+      <section className="rounded-3xl bg-white border border-slate-200 p-5 lg:p-7 shadow-sm">
         <h1 className="text-2xl lg:text-3xl font-black text-slate-900">Explore Courses</h1>
         <p className="text-slate-500 mt-2">Choose your course and jump into structured, media-rich learning.</p>
 
-        <div className="mt-4 flex items-center gap-2 rounded-2xl bg-slate-100 border border-slate-200 px-4 py-3">
-          <Search className="w-4 h-4 text-slate-500" />
+        <div className="mt-6 flex items-center gap-2 rounded-2xl bg-slate-100 border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-violet-500 focus-within:border-violet-500 transition-all">
+          <Search className="w-5 h-5 text-slate-400" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search courses..."
-            className="bg-transparent outline-none text-sm w-full"
+            className="bg-transparent outline-none text-sm w-full font-medium text-slate-900 placeholder:text-slate-400"
           />
         </div>
       </section>
 
       {/* My courses */}
       <section>
-        <h2 className="text-lg font-bold text-slate-900 mb-3">My courses</h2>
-        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
-          {myCourses.length === 0 ? (
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 text-center text-slate-500">You have no enrolled courses yet. Enroll from the list below.</div>
-          ) : (
-            myCourses.map((course) => (
-              <Link key={course.id} href={progressMap[course.id]?.rootNodeId ? `/courses/${progressMap[course.id]!.rootNodeId}` : `/courses/${course.id}`} className="rounded-3xl border border-slate-200 bg-white p-5 hover:shadow-lg hover:-translate-y-1 transition-all">
-                <div className="w-12 h-12 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center mb-4">
-                  <Compass className="w-6 h-6" />
+        <h2 className="text-xl font-bold text-slate-900 mb-4 px-1">My Enrolled Courses</h2>
+        {myCourses.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500 font-medium">
+            You have no enrolled courses yet. Enroll from the list below to start learning.
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+            {myCourses.map((course) => (
+              <Link 
+                key={course.id} 
+                href={progressMap[course.id]?.rootNodeId ? `/courses/${progressMap[course.id]!.rootNodeId}` : `/courses/${course.id}`} 
+                className="group rounded-3xl border border-slate-200 bg-white p-6 hover:shadow-xl hover:shadow-violet-900/5 hover:-translate-y-1 hover:border-violet-200 transition-all duration-300"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                  <Compass className="w-7 h-7" />
                 </div>
-                <h3 className="text-lg font-bold">{course.title}</h3>
-                <p className="text-sm text-slate-500 mt-1">{course.root_node_name || course.description}</p>
+                <h3 className="text-xl font-bold text-slate-900 leading-tight group-hover:text-violet-700 transition-colors">{course.title}</h3>
+                <p className="text-sm text-slate-500 mt-2 line-clamp-2">{course.root_node_name || course.description}</p>
 
-                <div className="mt-4">
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-2 bg-cyan-600" style={{ width: `${progressMap[course.id]?.percent ?? 0}%` }} />
+                <div className="mt-6">
+                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 transition-all duration-1000 ease-out" 
+                      style={{ width: `${progressMap[course.id]?.percent ?? 0}%` }} 
+                    />
                   </div>
-                  <p className="text-xs text-slate-500 mt-2">{progressMap[course.id]?.percent ?? 0}% complete • {progressMap[course.id]?.completed ?? 0}/{progressMap[course.id]?.total ?? 0} resources</p>
+                  <div className="flex items-center justify-between mt-2 text-xs font-semibold">
+                    <span className="text-slate-900">{progressMap[course.id]?.percent ?? 0}% complete</span>
+                    <span className="text-slate-500">{progressMap[course.id]?.completed ?? 0}/{progressMap[course.id]?.total ?? 0} resources</span>
+                  </div>
                 </div>
               </Link>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* All courses */}
       <section>
-        <h2 className="text-lg font-bold text-slate-900 mb-3">All courses</h2>
-        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <h2 className="text-xl font-bold text-slate-900 mb-4 px-1">All Available Courses</h2>
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtered.map((course) => (
-            <article key={course.id} className="rounded-3xl border border-slate-200 bg-white p-5 flex flex-col justify-between">
-              <div>
-                <div className="w-12 h-12 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center mb-4">
+            <article key={course.id} className="rounded-3xl border border-slate-200 bg-white p-6 flex flex-col shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex-1">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center mb-5">
                   <Compass className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">{course.title}</h3>
-                <p className="text-sm text-slate-500 mt-1 line-clamp-3">{course.description}</p>
+                <h3 className="text-lg font-bold text-slate-900 leading-tight">{course.title}</h3>
+                <p className="text-sm text-slate-500 mt-2 line-clamp-3 leading-relaxed">{course.description}</p>
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <Link href={`/courses/${course.id}`} className="text-sm font-semibold text-violet-600">Open course</Link>
+              <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between gap-3">
+                <Link href={`/courses/${course.id}`} className="text-sm font-bold text-violet-600 hover:text-violet-700">View details</Link>
+                
                 {course.is_enrolled ? (
-                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-bold">Enrolled</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1.5 text-xs font-bold">
+                    Enrolled
+                  </span>
                 ) : (
-                  <button onClick={() => handleEnroll(course.id)} className="rounded-xl bg-slate-900 text-white px-4 py-2 text-sm font-semibold hover:bg-slate-800">Enroll</button>
+                  <button 
+                    onClick={() => handleEnroll(course.id)} 
+                    disabled={enrollingId === course.id}
+                    className="rounded-xl bg-slate-900 text-white px-5 py-2.5 text-sm font-bold hover:bg-violet-600 transition-colors disabled:opacity-70 flex items-center gap-2"
+                  >
+                    {enrollingId === course.id && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Enroll
+                  </button>
                 )}
               </div>
             </article>
           ))}
+          
+          {filtered.length === 0 && (
+            <div className="col-span-full py-10 text-center text-slate-500">
+              No courses found matching "{query}".
+            </div>
+          )}
         </div>
       </section>
     </div>

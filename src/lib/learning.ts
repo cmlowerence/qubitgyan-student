@@ -1,40 +1,14 @@
 import api from '@/lib/api';
-import { KnowledgeNode, Resource, StudentProgress } from '@/types';
+import { KnowledgeNode, Resource, StudentProgress, Course } from '@/types';
 
-interface SearchNode {
+export interface SearchNode {
   id: number;
   name: string;
   href: string;
   type: KnowledgeNode['node_type'];
 }
 
-const sampleDomains: KnowledgeNode[] = [
-  { id: 101, name: 'Physics Mastery', node_type: 'DOMAIN', parent: null, order: 1, is_active: true },
-  { id: 102, name: 'Math Intelligence', node_type: 'DOMAIN', parent: null, order: 2, is_active: true },
-];
-
-const sampleSubjects: Record<number, KnowledgeNode[]> = {
-  101: [{ id: 201, name: 'Mechanics', node_type: 'SUBJECT', parent: 101, order: 1, is_active: true }],
-  102: [{ id: 202, name: 'Calculus', node_type: 'SUBJECT', parent: 102, order: 1, is_active: true }],
-  201: [
-    { id: 301, name: 'Vectors & Motion', node_type: 'SECTION', parent: 201, order: 1, is_active: true },
-    { id: 302, name: 'Newton Laws', node_type: 'TOPIC', parent: 201, order: 2, is_active: true },
-  ],
-};
-
-const sampleResources: Record<number, Resource[]> = {
-  301: [
-    {
-      id: 501,
-      title: 'Vectors Visual Lecture',
-      resource_type: 'VIDEO',
-      node: 301,
-      external_url: 'https://www.youtube.com/watch?v=7UuNQvQbV4w',
-      preview_link: 'https://www.youtube.com/embed/7UuNQvQbV4w',
-      order: 1,
-    },
-  ],
-};
+// --- CORE UTILS ---
 
 function extractList<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[];
@@ -72,55 +46,29 @@ function getAncestorChain(nodeId: number, map: Map<number, KnowledgeNode>): Know
   return chain;
 }
 
-function toSearchNodes(flat: KnowledgeNode[]): SearchNode[] {
-  const map = new Map(flat.map((node) => [node.id, node]));
-  return flat
-    .map((node) => {
-      const chain = getAncestorChain(node.id, map);
-      const domain = chain.find((item) => item.node_type === 'DOMAIN');
-      const subject = chain.find((item) => item.node_type === 'SUBJECT');
-      if (!domain) return null;
 
-      if (node.node_type === 'DOMAIN') {
-        return { id: node.id, name: node.name, href: `/courses/${node.id}`, type: node.node_type };
-      }
 
-      if (subject) {
-        return {
-          id: node.id,
-          name: chain.map((item) => item.name).join(' • '),
-          href: `/courses/${domain.id}/${subject.id}?unit=${node.id}`,
-          type: node.node_type,
-        };
-      }
-
-      return { id: node.id, name: node.name, href: `/courses/${domain.id}`, type: node.node_type };
-    })
-    .filter(Boolean) as SearchNode[];
-}
+// --- NODE & RESOURCE FETCHING ---
 
 export async function getDomains(): Promise<KnowledgeNode[]> {
   try {
     const { flat } = await getTreeAndFlat();
-    const domains = flat.filter((node) => node.parent === null && node.node_type === 'DOMAIN');
-    return domains.length ? domains : sampleDomains;
-  } catch {
-    return sampleDomains;
+    return flat.filter((node) => node.parent === null && node.node_type === 'DOMAIN');
+  } catch (error) {
+    console.error("Failed to fetch domains", error);
+    return [];
   }
 }
 
 export async function getChildren(parentId: number): Promise<KnowledgeNode[]> {
   try {
     const { flat } = await getTreeAndFlat();
-    const children = flat
+    return flat
       .filter((node) => node.parent === parentId)
       .sort((a, b) => (a.order || 0) - (b.order || 0));
-    if (children.length) return children;
   } catch {
-    // fallback
+    return [];
   }
-
-  return sampleSubjects[parentId] || [];
 }
 
 export async function getDescendantStudyNodes(subjectId: number): Promise<KnowledgeNode[]> {
@@ -145,7 +93,7 @@ export async function getDescendantStudyNodes(subjectId: number): Promise<Knowle
     const study = descendants.filter((node) => ['SECTION', 'TOPIC', 'SUBTOPIC'].includes(node.node_type) || (node.resource_count || 0) > 0);
     return study.sort((a, b) => (a.order || 0) - (b.order || 0));
   } catch {
-    return sampleSubjects[subjectId] || [];
+    return [];
   }
 }
 
@@ -154,8 +102,7 @@ export async function getNode(nodeId: number): Promise<KnowledgeNode | null> {
     const { flat } = await getTreeAndFlat();
     return flat.find((node) => node.id === nodeId) || null;
   } catch {
-    const all = [...sampleDomains, ...Object.values(sampleSubjects).flat()];
-    return all.find((node) => node.id === nodeId) || null;
+    return null;
   }
 }
 
@@ -164,30 +111,27 @@ export async function getResources(nodeId: number): Promise<Resource[]> {
     const { data } = await api.get(`/resources/?node=${nodeId}`);
     return extractList<Resource>(data).sort((a, b) => (a.order || 0) - (b.order || 0));
   } catch {
-    return sampleResources[nodeId] || [];
+    return [];
   }
 }
 
-export async function getSearchNodes(): Promise<SearchNode[]> {
-  try {
-    const { flat } = await getTreeAndFlat();
-    return toSearchNodes(flat);
-  } catch {
-    const flat = [...sampleDomains, ...Object.values(sampleSubjects).flat()];
-    return toSearchNodes(flat);
-  }
-}
+
+// --- PROGRESS & TRACKING ---
 
 export async function getProgressSummary() {
   try {
     const { data } = await api.get('/progress/');
     const entries = extractList<StudentProgress>(data);
     const completed = entries.filter((entry) => entry.is_completed);
+    
+    // Streak logic is now handled by backend, but we can compute recent local UI streaks here if needed.
+    // For real streak, we will hit the gamification profile endpoint.
     const uniqueDays = new Set(completed.map((entry) => new Date(entry.last_accessed).toISOString().slice(0, 10)));
+    
     return {
       completedResourceIds: new Set(completed.map((entry) => entry.resource)),
       completedCount: completed.length,
-      streakDays: uniqueDays.size,
+      streakDays: uniqueDays.size, 
       recent: completed
         .sort((a, b) => +new Date(b.last_accessed) - +new Date(a.last_accessed))
         .slice(0, 5),
@@ -197,22 +141,192 @@ export async function getProgressSummary() {
   }
 }
 
-/**
- * Save resume timestamp for a resource (server + localStorage fallback)
- */
 export async function saveResumeTimestamp(resourceId: number, seconds: number) {
-  // save locally first so UI can restore immediately
   try {
     localStorage.setItem(`resume_${resourceId}`, String(Math.floor(seconds)));
   } catch {}
 
-  // attempt server save (no hard failure for user)
   try {
-    await api.post('/public/tracking/save_timestamp/', { resource_id: resourceId, resume_timestamp: Math.floor(seconds) });
+    await api.post('/public/tracking/save_timestamp/', { 
+      resource_id: resourceId, 
+      resume_timestamp: Math.floor(seconds) 
+    });
   } catch (err) {
-    // silent - we'll keep local copy
-    console.debug('saveResumeTimestamp failed', err);
+    console.debug('saveResumeTimestamp failed on server, saved locally', err);
   }
 }
 
-export type { SearchNode };
+// --- NEW V2 API CONTRACT METHODS ---
+
+export async function getPublishedCourses(): Promise<Course[]> {
+  try {
+    const { data } = await api.get('/public/courses/');
+    return extractList<Course>(data);
+  } catch {
+    return [];
+  }
+}
+
+export async function getMyCourses(): Promise<Course[]> {
+  try {
+    const { data } = await api.get('/public/courses/my_courses/');
+    return extractList<Course>(data);
+  } catch {
+    return [];
+  }
+}
+
+export async function enrollInCourse(courseId: number): Promise<boolean> {
+  try {
+    await api.post(`/public/courses/${courseId}/enroll/`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function pingGamification(minutes: number = 5) {
+  try {
+    const { data } = await api.post('/public/gamification/ping/', { minutes });
+    return data;
+  } catch (error) {
+    console.error('Gamification ping failed', error);
+    return null;
+  }
+}
+export async function getCourseProgress(course: Course) {
+  try {
+    const progressSummary = await getProgressSummary();
+    const completedSet = progressSummary.completedResourceIds;
+    const rootNodeId = (course as any).root_node; 
+    
+    if (!rootNodeId) return { total: 0, completed: 0, percent: 0, rootNodeId: null };
+
+    const descendants = await getDescendantStudyNodes(rootNodeId);
+    
+    let totalResources = 0;
+    let completedResources = 0;
+
+    for (const node of descendants) {
+      if ((node.resource_count || 0) > 0) {
+        const nodeResources = await getResources(node.id);
+        totalResources += nodeResources.length;
+        
+        nodeResources.forEach(res => {
+          if (completedSet.has(res.id)) {
+            completedResources += 1;
+          }
+        });
+      }
+    }
+
+    const percent = totalResources === 0 ? 0 : Math.round((completedResources / totalResources) * 100);
+
+    return {
+      total: totalResources,
+      completed: completedResources,
+      percent,
+      rootNodeId
+    };
+
+  } catch (error) {
+    console.error("Error calculating course progress", error);
+    return { total: 0, completed: 0, percent: 0, rootNodeId: null };
+  }
+}
+
+export async function getMyProfile() {
+  try {
+    const { data } = await api.get('/public/my-profile/');
+    return data; 
+  } catch (error) {
+    console.error('Failed to fetch profile', error);
+    return null;
+  }
+}
+
+export async function changePassword(old_password: string, new_password: string) {
+  const { data } = await api.put('/public/change-password/', { old_password, new_password });
+  return data;
+}
+
+export async function getNotifications() {
+  try {
+    const { data } = await api.get('/public/notifications/');
+    return extractList<{id: number, title: string, message: string, created_at: string, is_read: boolean}>(data);
+  } catch {
+    return [];
+  }
+}
+
+export async function markNotificationRead(id: number) {
+  await api.post(`/public/notifications/${id}/mark_read/`);
+}
+
+export async function getBookmarks() {
+  try {
+    const { data } = await api.get('/public/bookmarks/');
+    return extractList<{id: number, resource: number, resource_title: string, resource_type: string, created_at: string}>(data);
+  } catch {
+    return [];
+  }
+}
+
+export async function addBookmark(resourceId: number) {
+  const { data } = await api.post('/public/bookmarks/', { resource: resourceId });
+  return data;
+}
+
+export async function removeBookmark(bookmarkId: number) {
+  await api.delete(`/public/bookmarks/${bookmarkId}/`);
+}
+
+export interface AttemptResponse {
+  id: number;
+  question: number;
+  question_text: string;
+  selected_option: number | null;
+  selected_option_text: string | null;
+  is_correct: boolean;
+}
+
+export interface QuizAttemptRecord {
+  id: number;
+  quiz: number;
+  quiz_title: string;
+  start_time: string;
+  end_time: string | null;
+  total_score: number;
+  is_completed: boolean;
+  responses: AttemptResponse[];
+}
+
+export async function getQuizAttempts(): Promise<QuizAttemptRecord[]> {
+  try {
+    const { data } = await api.get('/public/quiz-attempts/');
+    return extractList<QuizAttemptRecord>(data);
+  } catch (error) {
+    console.error('Failed to fetch quiz attempts', error);
+    return [];
+  }
+}
+
+export async function searchGlobal(query: string): Promise<SearchNode[]> {
+  if (!query.trim()) return [];
+  
+  try {
+    // Uses standard DRF search query parameter (?search=)
+    const { data } = await api.get(`/global-search/?search=${encodeURIComponent(query)}`);
+    const results = extractList<any>(data);
+    
+    return results.map((item: any) => ({
+      id: item.id,
+      name: item.name || item.title || 'Untitled', // Handles both Nodes and Resources
+      type: item.node_type || item.resource_type || 'RESULT',
+      href: item.url || `/courses/${item.domain_id || item.id}`, 
+    }));
+  } catch (error) {
+    console.error('Global search failed', error);
+    return [];
+  }
+}

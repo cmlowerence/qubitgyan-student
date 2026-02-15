@@ -50,15 +50,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // 2. Protect Routes (Security Guard)
-  useEffect(() => {
-    // List of public paths that don't require login
-    const publicPaths = ['/login', '/register', '/forgot-password'];
+useEffect(() => {
+    const publicPaths = ['/login', '/register', '/forgot-password', '/suspended'];
     
     if (!isLoading) {
-      if (!user && !publicPaths.includes(pathname)) {
+      if (user?.is_suspended && pathname !== '/suspended') {
+        router.push('/suspended');
+      } 
+      else if (!user && !publicPaths.includes(pathname)) {
         router.push('/login');
-      } else if (user && publicPaths.includes(pathname)) {
-        router.push('/dashboard');
+      } 
+      else if (user && !user.is_suspended && publicPaths.includes(pathname)) {
+        if (pathname !== '/suspended') {
+          router.push('/dashboard');
+        }
       }
     }
   }, [user, isLoading, pathname, router]);
