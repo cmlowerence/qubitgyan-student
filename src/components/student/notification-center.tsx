@@ -3,7 +3,7 @@
 import { Bell, CheckCheck, CircleCheck, Dot } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useUi } from '@/components/providers/ui-provider';
-import { markNotificationRead } from '@/lib/learning';
+import { markAllNotificationsRead, markNotificationRead } from '@/lib/learning';
 
 export interface NotificationItem {
   id: string;
@@ -77,7 +77,7 @@ export function NotificationCenter({ items }: NotificationCenterProps) {
 
     // 2. Fire API calls in parallel
     try {
-      await Promise.all(unreadItems.map((item) => markNotificationRead(Number(item.id))));
+      await markAllNotificationsRead();
       await showAlert({
         title: 'Updated',
         message: 'All notifications are now marked as read.',

@@ -1,4 +1,4 @@
-import { LayoutDashboard, BookOpen, User, FileText, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, BookOpen, User, FileText, ClipboardCheck, Bell, Activity } from 'lucide-react';
 
 export const studentNavItems = [
   {
@@ -12,9 +12,24 @@ export const studentNavItems = [
     icon: BookOpen,
   },
   {
+    title: 'Assessments',
+    href: '/assessments',
+    icon: ClipboardCheck,
+  },
+  {
     title: 'Resources',
     href: '/resources',
     icon: FileText,
+  },
+  {
+    title: 'Tracking',
+    href: '/tracking',
+    icon: Activity,
+  },
+  {
+    title: 'Notifications',
+    href: '/notifications',
+    icon: Bell,
   },
   {
     title: 'Profile',

@@ -12,7 +12,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useUi } from '@/components/providers/ui-provider';
-import api from '@/lib/api';
+import { studentApi } from '@/lib/student-api';
 import { useRouter } from 'next/navigation';
 
 interface AdmissionFormState {
@@ -70,16 +70,15 @@ export default function AdmissionPage(): JSX.Element {
 
     try {
       const payload = {
-        student_name: `${form.firstName} ${form.lastName}`.trim(),
-        first_name: form.firstName,
-        last_name: form.lastName,
+        student_first_name: form.firstName,
+        student_last_name: form.lastName,
         email: form.email,
         phone: form.phone,
         class_grade: form.grade,
         learning_goal: bridgeData,
       };
 
-      await api.post('/public/admissions/', payload);
+      await studentApi.submitAdmission(payload);
       router.push('/admission/success');
     } catch (err: any) {
       console.error('Admission API error', err);
