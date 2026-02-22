@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import { studentApi } from '@/lib/student-api';
 import { KnowledgeNode, Resource, StudentProgress, Course } from '@/types';
 
 export interface SearchNode {
@@ -236,27 +237,23 @@ export async function getCourseProgress(course: Course) {
 }
 
 export async function getMyProfile() {
-  try {
-    const { data } = await api.get('/public/my-profile/');
-    return data; 
-  } catch (error) {
-    console.error('Failed to fetch profile', error);
-    return null;
-  }
+  return studentApi.getMyProfile();
 }
 
 export async function changePassword(old_password: string, new_password: string) {
-  const { data } = await api.put('/public/change-password/', { old_password, new_password });
-  return data;
+  return studentApi.changePassword(old_password, new_password);
 }
 
 export async function getNotifications() {
-  try {
-    const { data } = await api.get('/public/notifications/');
-    return extractList<{id: number, title: string, message: string, created_at: string, is_read: boolean}>(data);
-  } catch {
-    return [];
-  }
+  return studentApi.getNotifications();
+}
+
+export async function getUnreadNotificationCount() {
+  return studentApi.getUnreadNotificationCount();
+}
+
+export async function markAllNotificationsRead() {
+  return studentApi.markAllNotificationsRead();
 }
 
 export async function markNotificationRead(id: number) {
@@ -264,21 +261,15 @@ export async function markNotificationRead(id: number) {
 }
 
 export async function getBookmarks() {
-  try {
-    const { data } = await api.get('/public/bookmarks/');
-    return extractList<{id: number, resource: number, resource_title: string, resource_type: string, created_at: string}>(data);
-  } catch {
-    return [];
-  }
+  return studentApi.getBookmarks();
 }
 
 export async function addBookmark(resourceId: number) {
-  const { data } = await api.post('/public/bookmarks/', { resource: resourceId });
-  return data;
+  return studentApi.addBookmark(resourceId);
 }
 
 export async function removeBookmark(bookmarkId: number) {
-  await api.delete(`/public/bookmarks/${bookmarkId}/`);
+  await studentApi.removeBookmark(bookmarkId);
 }
 
 export interface AttemptResponse {
@@ -329,4 +320,7 @@ export async function searchGlobal(query: string): Promise<SearchNode[]> {
     console.error('Global search failed', error);
     return [];
   }
+}
+export async function getTracking() {
+  return studentApi.getTracking();
 }
