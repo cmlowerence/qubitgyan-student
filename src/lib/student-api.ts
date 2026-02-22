@@ -7,12 +7,18 @@ export interface AdmissionPayload {
   phone: string;
   class_grade: string;
   learning_goal: string;
+  guardian_name: string;
+  guardian_phone: string;
+  preferred_mode: string;
+  address: string;
+  notes: string;
 }
 
 export interface ProfilePayload {
   username: string;
   email: string;
   first_name: string;
+  last_name: string;
   avatar_url: string | null;
   current_streak: number;
   longest_streak: number;
