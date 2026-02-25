@@ -91,7 +91,10 @@ export async function getDescendantStudyNodes(subjectId: number): Promise<Knowle
       queue.push(...(byParent.get(node.id) || []));
     }
 
-    const study = descendants.filter((node) => ['SECTION', 'TOPIC', 'SUBTOPIC'].includes(node.node_type) || (node.resource_count || 0) > 0);
+    const study = descendants.filter((node) => {
+      const directResources = (node.resource_count || 0) > 0 || (node.items_count || 0) > 0;
+      return directResources;
+    });
     return study.sort((a, b) => (a.order || 0) - (b.order || 0));
   } catch {
     return [];
