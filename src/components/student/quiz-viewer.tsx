@@ -18,6 +18,15 @@ interface Quiz { id: number; passing_score_percentage: number; time_limit_minute
 interface AttemptResponse { id: number; question: number; question_text: string; selected_option: number | null; selected_option_text: string; is_correct: boolean; }
 interface AttemptResult { id: number; total_score: number; is_completed: boolean; responses: AttemptResponse[]; }
 
+
+function extractList<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (typeof data === 'object' && data !== null && 'results' in data && Array.isArray((data as { results?: unknown[] }).results)) {
+    return (data as { results: T[] }).results;
+  }
+  return [];
+}
+
 export function QuizViewer({ resource, onComplete }: QuizViewerProps) {
   const { showConfirm, showAlert } = useUi();
   
@@ -36,9 +45,19 @@ export function QuizViewer({ resource, onComplete }: QuizViewerProps) {
       setIsLoading(true);
       try {
         const { data } = await api.get(`/public/quizzes/?resource=${resource.id}`);
-        if (data && data.length > 0) {
-          setQuiz(data[0]);
-          setTimeLeft(data[0].time_limit_minutes * 60);
+        const quizzes = extractList<Quiz>(data);
+        if (quizzes.length > 0) {
+          const nextQuiz = {
+            ...quizzes[0],
+            questions: [...(quizzes[0].questions || [])]
+              .sort((a, b) => (a.order || 0) - (b.order || 0))
+              .map((question) => ({
+                ...question,
+                options: [...(question.options || [])].sort((a, b) => a.id - b.id),
+              })),
+          };
+          setQuiz(nextQuiz);
+          setTimeLeft((nextQuiz.time_limit_minutes || 0) * 60);
         }
       } catch (error) {
         console.error("Failed to load quiz", error);

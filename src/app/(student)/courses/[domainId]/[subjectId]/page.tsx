@@ -44,12 +44,27 @@ export default function SubjectLearningPage() {
       return;
     }
 
-    getResources(activeUnit.id).then((items) => {
-      const mapped = items.map((item) => ({ ...item, is_completed: completedIds.has(item.id) }));
+    const loadUnitResources = async () => {
+      const currentItems = await getResources(activeUnit.id);
+
+      if (currentItems.length === 0) {
+        for (const unit of units) {
+          if (unit.id === activeUnit.id) continue;
+          const fallbackItems = await getResources(unit.id);
+          if (fallbackItems.length > 0) {
+            setActiveUnit(unit);
+            return;
+          }
+        }
+      }
+
+      const mapped = currentItems.map((item) => ({ ...item, is_completed: completedIds.has(item.id) }));
       setResources(mapped);
       setActiveResource(mapped[0] || null);
-    });
-  }, [activeUnit, completedIds]);
+    };
+
+    loadUnitResources();
+  }, [activeUnit, completedIds, units]);
 
   const filteredUnits = useMemo(() => units.filter((unit) => unit.name.toLowerCase().includes(query.toLowerCase())), [units, query]);
 

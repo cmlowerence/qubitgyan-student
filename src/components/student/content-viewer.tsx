@@ -219,9 +219,10 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
 
   if (!resource) return <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">Choose a resource to start learning.</div>;
 
-  const isPdf = resource.resource_type === 'PDF';
-  const isVideo = resource.resource_type === 'VIDEO';
-  const isQuiz = resource.resource_type === 'QUIZ';
+  const normalizedType = resource.resource_type?.toUpperCase();
+  const isPdf = normalizedType === 'PDF';
+  const isVideo = normalizedType === 'VIDEO';
+  const isQuiz = normalizedType === 'QUIZ';
 
   return (
     <div className="space-y-4">
