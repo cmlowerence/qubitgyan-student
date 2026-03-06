@@ -1,3 +1,4 @@
+// src/lib/courses.ts
 import api from '@/lib/api';
 import { Course } from '@/types';
 import { getDescendantStudyNodes, getResources, getProgressSummary } from './learning';
@@ -10,7 +11,6 @@ function extractList<T>(data: unknown): T[] {
   return [];
 }
 
-// Cache based on the exact Node ID instead of string names for perfect accuracy
 const resourceIdsCache = new Map<number, number[]>();
 
 export async function getCourseResourceIds(rootNodeId: number | null | undefined): Promise<number[]> {
@@ -18,11 +18,9 @@ export async function getCourseResourceIds(rootNodeId: number | null | undefined
   if (resourceIdsCache.has(rootNodeId)) return resourceIdsCache.get(rootNodeId)!;
 
   try {
-    // Include root node + all descendants
     const descendants = await getDescendantStudyNodes(rootNodeId);
     const nodeIds = [rootNodeId, ...descendants.map((d) => d.id)];
 
-    // Fetch resources for all these nodes
     const resourcesPerNode = await Promise.all(nodeIds.map((id) => getResources(id)));
     const ids = new Set<number>();
     
@@ -33,8 +31,7 @@ export async function getCourseResourceIds(rootNodeId: number | null | undefined
     const arr = Array.from(ids);
     resourceIdsCache.set(rootNodeId, arr);
     return arr;
-  } catch (err) {
-    console.debug('getCourseResourceIds failed', err);
+  } catch {
     resourceIdsCache.set(rootNodeId, []);
     return [];
   }
@@ -42,8 +39,6 @@ export async function getCourseResourceIds(rootNodeId: number | null | undefined
 
 export async function getCourseProgress(course: Course): Promise<{ total: number; completed: number; percent: number; rootNodeId?: number | null }> {
   try {
-    // Directly use the root_node ID provided by the Django Serializer
-    // (Cast to any just in case it's not strictly typed in your types/index.ts yet)
     const rootNodeId = (course as any).root_node || null;
     
     const resourceIds = await getCourseResourceIds(rootNodeId);
@@ -55,8 +50,7 @@ export async function getCourseProgress(course: Course): Promise<{ total: number
     const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
     
     return { total, completed, percent, rootNodeId };
-  } catch (err) {
-    console.debug('getCourseProgress failed', err);
+  } catch {
     return { total: 0, completed: 0, percent: 0, rootNodeId: null };
   }
 }
@@ -65,8 +59,7 @@ export async function getCourses(): Promise<Course[]> {
   try {
     const { data } = await api.get('/public/courses/');
     return extractList<Course>(data);
-  } catch (err) {
-    console.debug('getCourses failed', err);
+  } catch {
     return [];
   }
 }
@@ -75,8 +68,7 @@ export async function getMyCourses(): Promise<Course[]> {
   try {
     const { data } = await api.get('/public/courses/my_courses/');
     return extractList<Course>(data);
-  } catch (err) {
-    console.debug('getMyCourses failed', err);
+  } catch {
     return [];
   }
 }
@@ -85,8 +77,7 @@ export async function enrollInCourse(courseId: number): Promise<{ status: string
   try {
     const { data } = await api.post(`/public/courses/${courseId}/enroll/`);
     return data as { status: string };
-  } catch (err) {
-    console.debug('enrollInCourse failed', err);
+  } catch {
     return null;
   }
 }

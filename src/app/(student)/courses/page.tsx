@@ -1,3 +1,4 @@
+// src/app/(student)/courses/page.tsx
 'use client';
 
 import Link from 'next/link';
@@ -15,7 +16,6 @@ export default function CoursesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [enrollingId, setEnrollingId] = useState<number | null>(null);
   
-  // Progress Map: { courseId: { total, completed, percent, rootNodeId } }
   const [progressMap, setProgressMap] = useState<Record<number, { total: number; completed: number; percent: number; rootNodeId?: number | null }>>({});
   
   const { showAlert } = useUi();
@@ -25,15 +25,12 @@ export default function CoursesPage() {
     const load = async () => {
       setIsLoading(true);
       try {
-        // 1. Fetch published courses (backend includes `is_enrolled` flag)
         const all = await getPublishedCourses();
         setCourses(all);
 
-        // 2. Fetch enrolled list separately (if needed, though `all` has the flag)
         const mine = await getMyCourses();
         setMyCourses(mine);
 
-        // 3. Compute per-course progress for ENROLLED courses (to save API calls)
         const progressPromises = mine.map(async (c) => {
           const meta = await getCourseProgress(c);
           return [c.id, meta] as const;
@@ -42,9 +39,7 @@ export default function CoursesPage() {
         const results = await Promise.all(progressPromises);
         const map = Object.fromEntries(results.map(([id, v]) => [id, v]));
         setProgressMap(map as Record<number, { total: number; completed: number; percent: number; rootNodeId?: number | null }>);
-
-      } catch (error) {
-        console.error("Failed to load courses", error);
+      } catch {
       } finally {
         setIsLoading(false);
       }
@@ -58,23 +53,19 @@ export default function CoursesPage() {
   const handleEnroll = async (courseId: number) => {
     setEnrollingId(courseId);
     try {
-      // Optimistic update
       setCourses((s) => s.map((c) => (c.id === courseId ? { ...c, is_enrolled: true } : c)));
       
       const res = await enrollInCourse(courseId);
       
       if (!res) {
-        // Revert on failure
         setCourses((s) => s.map((c) => (c.id === courseId ? { ...c, is_enrolled: false } : c)));
         await showAlert({ title: 'Enrollment failed', message: 'Could not enroll — please try again.', variant: 'error' });
         return;
       }
 
-      // Refresh myCourses to ensure it appears in the top list
       const mine = await getMyCourses();
       setMyCourses(mine);
       
-      // Calculate progress for the newly enrolled course
       const newlyEnrolled = mine.find(c => c.id === courseId);
       if (newlyEnrolled) {
          const meta = await getCourseProgress(newlyEnrolled);
@@ -82,7 +73,7 @@ export default function CoursesPage() {
       }
 
       await showAlert({ title: 'Enrolled', message: 'You are now enrolled in this course.', variant: 'success' });
-    } catch (error) {
+    } catch {
       await showAlert({ title: 'Error', message: 'An unexpected error occurred.', variant: 'error' });
     } finally {
       setEnrollingId(null);
@@ -90,14 +81,20 @@ export default function CoursesPage() {
   };
 
   if (isLoading) {
-    return <div className="p-10 text-center text-slate-500 flex flex-col items-center gap-3"><Loader2 className="w-8 h-8 animate-spin text-violet-600"/> Loading your library...</div>;
+    return <div className="p-10 text-center text-slate-500 flex flex-col items-center gap-3"><Loader2 className="w-8 h-8 animate-spin text-violet-600"/> Loading your courses...</div>;
   }
 
+  const getCourseUrl = (course: Course) => {
+    const rootNodeId = progressMap[course.id]?.rootNodeId || (course as any).root_node;
+    if (rootNodeId) return `/courses/${rootNodeId}`;
+    return `/courses/${course.id}`;
+  };
+
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-8 pb-10 px-4 md:px-6 lg:px-8 max-w-7xl mx-auto">
       <section className="rounded-3xl bg-white border border-slate-200 p-5 lg:p-7 shadow-sm">
-        <h1 className="text-2xl lg:text-3xl font-black text-slate-900">Explore Courses</h1>
-        <p className="text-slate-500 mt-2">Choose your course and jump into structured, media-rich learning.</p>
+        <h1 className="text-2xl md:text-3xl font-black text-slate-900">Explore Courses</h1>
+        <p className="text-slate-500 mt-2 text-sm lg:text-base">Choose your course and jump into structured, media-rich learning.</p>
 
         <div className="mt-6 flex items-center gap-2 rounded-2xl bg-slate-100 border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-violet-500 focus-within:border-violet-500 transition-all">
           <Search className="w-5 h-5 text-slate-400" />
@@ -110,7 +107,6 @@ export default function CoursesPage() {
         </div>
       </section>
 
-      {/* My courses */}
       <section>
         <h2 className="text-xl font-bold text-slate-900 mb-4 px-1">My Enrolled Courses</h2>
         {myCourses.length === 0 ? (
@@ -118,20 +114,22 @@ export default function CoursesPage() {
             You have no enrolled courses yet. Enroll from the list below to start learning.
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {myCourses.map((course) => (
               <Link 
                 key={course.id} 
-                href={progressMap[course.id]?.rootNodeId ? `/courses/${progressMap[course.id]!.rootNodeId}` : `/courses/${course.id}`} 
-                className="group rounded-3xl border border-slate-200 bg-white p-6 hover:shadow-xl hover:shadow-violet-900/5 hover:-translate-y-1 hover:border-violet-200 transition-all duration-300"
+                href={getCourseUrl(course)}
+                className="group rounded-3xl border border-slate-200 bg-white p-5 lg:p-6 hover:shadow-xl hover:shadow-violet-900/5 hover:-translate-y-1 hover:border-violet-200 transition-all duration-300 flex flex-col"
               >
-                <div className="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
-                  <Compass className="w-7 h-7" />
+                <div className="flex-1">
+                  <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                    <Compass className="w-6 h-6 lg:w-7 lg:h-7" />
+                  </div>
+                  <h3 className="text-lg lg:text-xl font-bold text-slate-900 leading-tight group-hover:text-violet-700 transition-colors">{course.title}</h3>
+                  <p className="text-sm text-slate-500 mt-2 line-clamp-2">{(course as any).root_node_name || course.description}</p>
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 leading-tight group-hover:text-violet-700 transition-colors">{course.title}</h3>
-                <p className="text-sm text-slate-500 mt-2 line-clamp-2">{course.root_node_name || course.description}</p>
 
-                <div className="mt-6">
+                <div className="mt-6 pt-4 border-t border-slate-100">
                   <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 transition-all duration-1000 ease-out" 
@@ -149,12 +147,11 @@ export default function CoursesPage() {
         )}
       </section>
 
-      {/* All courses */}
       <section>
         <h2 className="text-xl font-bold text-slate-900 mb-4 px-1">All Available Courses</h2>
-        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map((course) => (
-            <article key={course.id} className="rounded-3xl border border-slate-200 bg-white p-6 flex flex-col shadow-sm hover:shadow-md transition-shadow">
+            <article key={course.id} className="rounded-3xl border border-slate-200 bg-white p-5 lg:p-6 flex flex-col shadow-sm hover:shadow-md transition-shadow">
               <div className="flex-1">
                 <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center mb-5">
                   <Compass className="w-6 h-6" />
@@ -164,7 +161,7 @@ export default function CoursesPage() {
               </div>
 
               <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between gap-3">
-                <Link href={`/courses/${course.id}`} className="text-sm font-bold text-violet-600 hover:text-violet-700">View details</Link>
+                <Link href={getCourseUrl(course)} className="text-sm font-bold text-violet-600 hover:text-violet-700">View details</Link>
                 
                 {course.is_enrolled ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1.5 text-xs font-bold">

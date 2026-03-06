@@ -4,7 +4,7 @@ export interface UserProfile {
   email: string;
   first_name: string;
   last_name: string;
-  username: string; // Added 'username' as it is central to your auth now
+  username: string;
   avatar_url?: string;
   is_suspended: boolean;
   is_staff?: boolean;
@@ -18,7 +18,7 @@ export interface KnowledgeNode {
   parent: number | null;
   order: number;
   thumbnail_url?: string;
-  is_active: boolean; // From Serializer
+  is_active: boolean;
   
   // These come from the 'get_children' method in your serializer
   children?: KnowledgeNode[]; 
