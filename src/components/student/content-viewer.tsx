@@ -259,7 +259,7 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
             </video>
           ) : (
             <div className="space-y-2">
-              <p className="px-3 pt-3 text-xs text-slate-300">If the player does not load, use "Open original" below.</p>
+              <p className="px-3 pt-3 text-xs text-slate-300">If the player does not load, use &quot;Open original&quot; below.</p>
               <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
               <iframe
                 src={embedUrl}
