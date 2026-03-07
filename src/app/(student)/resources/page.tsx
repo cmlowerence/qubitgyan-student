@@ -71,7 +71,7 @@ export default function SavedResourcesPage() {
           <Bookmark className="w-8 h-8 text-amber-500 fill-amber-500/20" /> 
           Saved Resources
         </h1>
-        <p className="text-slate-500 mt-2 text-lg">Quick access to the materials you've bookmarked for later review.</p>
+        <p className="text-slate-500 mt-2 text-lg">Quick access to the materials you&apos;ve bookmarked for later review.</p>
       </div>
 
       {bookmarks.length === 0 ? (
@@ -79,7 +79,7 @@ export default function SavedResourcesPage() {
           <Bookmark className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <h3 className="text-2xl font-bold text-slate-900">Your library is empty</h3>
           <p className="text-slate-500 mt-2 max-w-sm mx-auto">
-            When you find a video, PDF, or quiz you want to keep handy, click the "Save for later" button to bookmark it here.
+            When you find a video, PDF, or quiz you want to keep handy, click the &quot;Save for later&quot; button to bookmark it here.
           </p>
         </div>
       ) : (

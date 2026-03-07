@@ -183,7 +183,7 @@ export default function CoursesPage() {
           
           {filtered.length === 0 && (
             <div className="col-span-full py-10 text-center text-slate-500">
-              No courses found matching "{query}".
+              No courses found matching &quot;{query}&quot;.
             </div>
           )}
         </div>

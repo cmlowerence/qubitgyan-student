@@ -133,7 +133,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
                     ))
                   ) : (
                     <div className="p-4 text-center text-sm text-slate-500">
-                      No results found for "{query}".
+                      No results found for &quot;{query}&quot;.
                     </div>
                   )}
                 </div>
