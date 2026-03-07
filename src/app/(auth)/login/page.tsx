@@ -2,93 +2,118 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Logo } from '@/components/ui/logo';
+import { ArrowRight, Loader2, Lock, Mail, UserPlus } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
+import { Logo } from '@/components/ui/logo';
 import { useUi } from '@/components/providers/ui-provider';
-import api from '@/lib/api';
-import { Loader2, User, Lock, ArrowRight, UserPlus } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
   const { showAlert } = useUi();
-  const [username, setUsername] = useState('');
+
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username || !password) {
-      showAlert({ title: 'Missing Information', message: 'Please enter both your username and password.', variant: 'warning' });
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!email || !password) {
+      showAlert({
+        title: 'Missing credentials',
+        message: 'Please enter your registered email and password to continue.',
+        variant: 'warning',
+      });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const baseUrl = api.defaults.baseURL || '';
-      const loginUrl = baseUrl.replace('/v1', '/token/');
-      const response = await api.post(loginUrl, { username, password });
-      await login(response.data.access);
+      await login(email.trim(), password);
     } catch (error: any) {
-      const status = error.response?.status;
-      let msg = 'Something went wrong. Please try again.';
-      if (status === 404) msg = 'Login endpoint not found. Contact Admin.';
-      else if (status === 401) msg = 'Invalid username or password.';
-      else if (status === 403) msg = 'Your account is suspended.';
-      showAlert({ title: 'Login Failed', message: msg, variant: 'error' });
+      const status = error?.response?.status;
+      const message =
+        status === 401
+          ? 'Invalid email or password.'
+          : status === 403
+            ? 'Your account is currently suspended.'
+            : 'We could not sign you in. Please try again.';
+
+      showAlert({
+        title: 'Sign in failed',
+        message,
+        variant: 'error',
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl rounded-2xl p-8 animate-in-scale">
-      <div className="flex flex-col items-center mb-8">
-        <Logo theme="light" className="scale-90 mb-4" />
-        <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
-        <p className="text-slate-500 text-sm">Sign in to continue your learning journey</p>
+    <div className="w-full max-w-5xl grid lg:grid-cols-2 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-indigo-100/50">
+      <div className="hidden lg:flex flex-col justify-between bg-[radial-gradient(circle_at_top,#6366f1,#1d4ed8_45%,#0f172a)] p-10 text-white">
+        <div>
+          <Logo theme="dark" />
+          <h1 className="mt-10 text-4xl font-black leading-tight">A complete student portal rebuilt for focused learning.</h1>
+          <p className="mt-4 text-indigo-100">Track progress, access resources, take assessments, and stay updated from one responsive dashboard.</p>
+        </div>
+        <p className="text-sm text-indigo-100/80">Secure access with your registered email address.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="space-y-1">
-          <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Username</label>
-          <div className="relative group">
-            <User className="absolute left-3 top-3 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4"
-              placeholder="Enter your username"
-            />
-          </div>
+      <div className="p-6 sm:p-10">
+        <div className="mb-8 lg:hidden">
+          <Logo theme="light" className="scale-90 origin-left" />
         </div>
 
-        <div className="space-y-1">
-          <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Password</label>
-          <div className="relative group">
-            <Lock className="absolute left-3 top-3 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4"
-              placeholder="••••••••"
-            />
-          </div>
-        </div>
+        <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Sign in</h2>
+        <p className="mt-2 text-slate-500">Use your email address as your username.</p>
 
-        <button type="submit" disabled={isSubmitting} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
-          {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-          {isSubmitting ? 'Verifying...' : <><span>Sign In</span><ArrowRight className="w-5 h-5" /></>}
-        </button>
-      </form>
+        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+          <label className="block space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Email</span>
+            <div className="relative">
+              <Mail className="w-5 h-5 text-slate-400 absolute left-3 top-3" />
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-11 pr-4 outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="student@example.com"
+                autoComplete="email"
+              />
+            </div>
+          </label>
 
-      <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-        <Link href="/admission" className="group flex items-center justify-center gap-2 w-full text-sm text-slate-500 hover:text-blue-600 transition-colors">
-          <span>Don&apos;t have an account?</span>
-          <span className="font-semibold underline underline-offset-2 decoration-transparent group-hover:decoration-blue-600 transition-all flex items-center gap-1">
-            Enroll Here <UserPlus className="w-4 h-4" />
-          </span>
+          <label className="block space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Password</span>
+            <div className="relative">
+              <Lock className="w-5 h-5 text-slate-400 absolute left-3 top-3" />
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-11 pr-4 outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="••••••••"
+                autoComplete="current-password"
+              />
+            </div>
+          </label>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full rounded-xl bg-slate-900 py-3 font-bold text-white hover:bg-indigo-600 transition flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {isSubmitting ? (
+              <><Loader2 className="w-5 h-5 animate-spin" />Signing in...</>
+            ) : (
+              <>Continue <ArrowRight className="w-5 h-5" /></>
+            )}
+          </button>
+        </form>
+
+        <Link href="/admission" className="mt-8 flex items-center justify-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-700">
+          Need an account? Submit admission request <UserPlus className="w-4 h-4" />
         </Link>
       </div>
     </div>
