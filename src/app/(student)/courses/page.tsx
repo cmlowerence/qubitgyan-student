@@ -1,193 +1,95 @@
-// src/app/(student)/courses/page.tsx
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { getPublishedCourses, getMyCourses, enrollInCourse, getCourseProgress } from '@/lib/learning';
+import { useEffect, useMemo, useState } from 'react';
+import { Compass, Loader2, Search } from 'lucide-react';
 import { Course } from '@/types';
-import { Compass, Search, Loader2 } from 'lucide-react';
+import { enrollInCourse, getMyCourses, getPublishedCourses } from '@/lib/learning';
 import { useUi } from '@/components/providers/ui-provider';
-import { useAuth } from '@/context/auth-context';
 
 export default function CoursesPage() {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [myCourses, setMyCourses] = useState<Course[]>([]);
-  const [query, setQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [enrollingId, setEnrollingId] = useState<number | null>(null);
-  
-  const [progressMap, setProgressMap] = useState<Record<number, { total: number; completed: number; percent: number; rootNodeId?: number | null }>>({});
-  
   const { showAlert } = useUi();
-  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [allCourses, setAllCourses] = useState<Course[]>([]);
+  const [myCourseIds, setMyCourseIds] = useState<Set<number>>(new Set());
+  const [query, setQuery] = useState('');
+  const [enrollingId, setEnrollingId] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
-      try {
-        const all = await getPublishedCourses();
-        setCourses(all);
-
-        const mine = await getMyCourses();
-        setMyCourses(mine);
-
-        const progressPromises = mine.map(async (c) => {
-          const meta = await getCourseProgress(c);
-          return [c.id, meta] as const;
-        });
-
-        const results = await Promise.all(progressPromises);
-        const map = Object.fromEntries(results.map(([id, v]) => [id, v]));
-        setProgressMap(map as Record<number, { total: number; completed: number; percent: number; rootNodeId?: number | null }>);
-      } catch {
-      } finally {
-        setIsLoading(false);
-      }
+      const [published, mine] = await Promise.all([getPublishedCourses(), getMyCourses()]);
+      setAllCourses(published);
+      setMyCourseIds(new Set(mine.map((course) => course.id)));
+      setIsLoading(false);
     };
-    
-    if (user) load();
-  }, [user]);
 
-  const filtered = courses.filter((c) => c.title.toLowerCase().includes(query.toLowerCase()));
+    load();
+  }, []);
+
+  const filteredCourses = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return allCourses;
+
+    return allCourses.filter((course) =>
+      `${course.title} ${course.description || ''}`.toLowerCase().includes(term),
+    );
+  }, [allCourses, query]);
 
   const handleEnroll = async (courseId: number) => {
     setEnrollingId(courseId);
-    try {
-      setCourses((s) => s.map((c) => (c.id === courseId ? { ...c, is_enrolled: true } : c)));
-      
-      const res = await enrollInCourse(courseId);
-      
-      if (!res) {
-        setCourses((s) => s.map((c) => (c.id === courseId ? { ...c, is_enrolled: false } : c)));
-        await showAlert({ title: 'Enrollment failed', message: 'Could not enroll — please try again.', variant: 'error' });
-        return;
-      }
+    const ok = await enrollInCourse(courseId);
 
-      const mine = await getMyCourses();
-      setMyCourses(mine);
-      
-      const newlyEnrolled = mine.find(c => c.id === courseId);
-      if (newlyEnrolled) {
-         const meta = await getCourseProgress(newlyEnrolled);
-         setProgressMap(prev => ({...prev, [courseId]: meta}));
-      }
-
-      await showAlert({ title: 'Enrolled', message: 'You are now enrolled in this course.', variant: 'success' });
-    } catch {
-      await showAlert({ title: 'Error', message: 'An unexpected error occurred.', variant: 'error' });
-    } finally {
-      setEnrollingId(null);
+    if (ok) {
+      setMyCourseIds((prev) => new Set(prev).add(courseId));
+      showAlert({ title: 'Enrollment successful', message: 'Course is now added to your profile.', variant: 'success' });
+    } else {
+      showAlert({ title: 'Enrollment failed', message: 'Please try again in a moment.', variant: 'error' });
     }
+
+    setEnrollingId(null);
   };
 
   if (isLoading) {
-    return <div className="p-10 text-center text-slate-500 flex flex-col items-center gap-3"><Loader2 className="w-8 h-8 animate-spin text-violet-600"/> Loading your courses...</div>;
+    return <div className="min-h-[40vh] grid place-items-center text-slate-500"><Loader2 className="w-6 h-6 animate-spin" /></div>;
   }
 
-  const getCourseUrl = (course: Course) => {
-    const rootNodeId = progressMap[course.id]?.rootNodeId || (course as any).root_node;
-    if (rootNodeId) return `/courses/${rootNodeId}`;
-    return `/courses/${course.id}`;
-  };
-
   return (
-    <div className="space-y-8 pb-10 px-4 md:px-6 lg:px-8 max-w-7xl mx-auto">
-      <section className="rounded-3xl bg-white border border-slate-200 p-5 lg:p-7 shadow-sm">
-        <h1 className="text-2xl md:text-3xl font-black text-slate-900">Explore Courses</h1>
-        <p className="text-slate-500 mt-2 text-sm lg:text-base">Choose your course and jump into structured, media-rich learning.</p>
-
-        <div className="mt-6 flex items-center gap-2 rounded-2xl bg-slate-100 border border-slate-200 px-4 py-3 focus-within:ring-2 focus-within:ring-violet-500 focus-within:border-violet-500 transition-all">
-          <Search className="w-5 h-5 text-slate-400" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search courses..."
-            className="bg-transparent outline-none text-sm w-full font-medium text-slate-900 placeholder:text-slate-400"
-          />
+    <div className="space-y-5 pb-8">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <h1 className="text-2xl font-black text-slate-900">Courses</h1>
+        <p className="text-sm text-slate-500 mt-1">Fully responsive catalog synced from student APIs.</p>
+        <div className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <Search className="w-4 h-4 text-slate-400" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by title or description" className="w-full bg-transparent outline-none text-sm" />
         </div>
       </section>
 
-      <section>
-        <h2 className="text-xl font-bold text-slate-900 mb-4 px-1">My Enrolled Courses</h2>
-        {myCourses.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500 font-medium">
-            You have no enrolled courses yet. Enroll from the list below to start learning.
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {myCourses.map((course) => (
-              <Link 
-                key={course.id} 
-                href={getCourseUrl(course)}
-                className="group rounded-3xl border border-slate-200 bg-white p-5 lg:p-6 hover:shadow-xl hover:shadow-violet-900/5 hover:-translate-y-1 hover:border-violet-200 transition-all duration-300 flex flex-col"
-              >
-                <div className="flex-1">
-                  <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
-                    <Compass className="w-6 h-6 lg:w-7 lg:h-7" />
-                  </div>
-                  <h3 className="text-lg lg:text-xl font-bold text-slate-900 leading-tight group-hover:text-violet-700 transition-colors">{course.title}</h3>
-                  <p className="text-sm text-slate-500 mt-2 line-clamp-2">{(course as any).root_node_name || course.description}</p>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-slate-100">
-                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 transition-all duration-1000 ease-out" 
-                      style={{ width: `${progressMap[course.id]?.percent ?? 0}%` }} 
-                    />
-                  </div>
-                  <div className="flex items-center justify-between mt-2 text-xs font-semibold">
-                    <span className="text-slate-900">{progressMap[course.id]?.percent ?? 0}% complete</span>
-                    <span className="text-slate-500">{progressMap[course.id]?.completed ?? 0}/{progressMap[course.id]?.total ?? 0} resources</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h2 className="text-xl font-bold text-slate-900 mb-4 px-1">All Available Courses</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((course) => (
-            <article key={course.id} className="rounded-3xl border border-slate-200 bg-white p-5 lg:p-6 flex flex-col shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex-1">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center mb-5">
-                  <Compass className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 leading-tight">{course.title}</h3>
-                <p className="text-sm text-slate-500 mt-2 line-clamp-3 leading-relaxed">{course.description}</p>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filteredCourses.map((course) => {
+          const isEnrolled = myCourseIds.has(course.id);
+          return (
+            <article key={course.id} className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col">
+              <div className="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-600 grid place-items-center">
+                <Compass className="w-5 h-5" />
               </div>
-
-              <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between gap-3">
-                <Link href={getCourseUrl(course)} className="text-sm font-bold text-violet-600 hover:text-violet-700">View details</Link>
-                
-                {course.is_enrolled ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1.5 text-xs font-bold">
-                    Enrolled
-                  </span>
+              <h3 className="font-black text-slate-900 mt-4">{course.title}</h3>
+              <p className="text-sm text-slate-500 mt-2 line-clamp-3">{course.description || 'Structured learning content available after enrollment.'}</p>
+              <div className="mt-5 pt-4 border-t border-slate-100">
+                {isEnrolled ? (
+                  <Link href={`/courses/${(course as any).root_node || course.id}`} className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white">
+                    Continue Course
+                  </Link>
                 ) : (
-                  <button 
-                    onClick={() => handleEnroll(course.id)} 
-                    disabled={enrollingId === course.id}
-                    className="rounded-xl bg-slate-900 text-white px-5 py-2.5 text-sm font-bold hover:bg-violet-600 transition-colors disabled:opacity-70 flex items-center gap-2"
-                  >
-                    {enrollingId === course.id && <Loader2 className="w-4 h-4 animate-spin" />}
-                    Enroll
+                  <button onClick={() => handleEnroll(course.id)} disabled={enrollingId === course.id} className="inline-flex rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+                    {enrollingId === course.id ? 'Enrolling...' : 'Enroll Now'}
                   </button>
                 )}
               </div>
             </article>
-          ))}
-          
-          {filtered.length === 0 && (
-            <div className="col-span-full py-10 text-center text-slate-500">
-              No courses found matching &quot;{query}&quot;.
-            </div>
-          )}
-        </div>
-      </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

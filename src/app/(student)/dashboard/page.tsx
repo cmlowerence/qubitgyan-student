@@ -1,81 +1,103 @@
 'use client';
 
 import Link from 'next/link';
-import { ComponentType, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { ArrowRight, BookOpenCheck, Clock3, Flame, GraduationCap, Trophy } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
-import { getChildren, getDomains, getProgressSummary, getMyProfile } from '@/lib/learning';
-import { KnowledgeNode } from '@/types';
-import { ArrowRight, BookOpen, Flame, Layers, Trophy } from 'lucide-react';
+import { Course, KnowledgeNode } from '@/types';
+import { getDomains, getMyCourses, getProgressSummary, getQuizAttempts } from '@/lib/learning';
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [tracks, setTracks] = useState<KnowledgeNode[]>([]);
-  const [counts, setCounts] = useState<Record<number, number>>({});
-  const [streak, setStreak] = useState(0);
-  const [completedCount, setCompletedCount] = useState(0);
+
+  const [domains, setDomains] = useState<KnowledgeNode[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [completedResources, setCompletedResources] = useState(0);
+  const [recentActivity, setRecentActivity] = useState(0);
+  const [quizCount, setQuizCount] = useState(0);
 
   useEffect(() => {
     const load = async () => {
-      // 1. Load Tracks & Subjects
-      const loadedTracks = await getDomains();
-      setTracks(loadedTracks);
-      const entries = await Promise.all(loadedTracks.map(async (track) => [track.id, (await getChildren(track.id)).length] as const));
-      setCounts(Object.fromEntries(entries));
-      
-      // 2. Load Completed Resources Count
-      const progress = await getProgressSummary();
-      setCompletedCount(progress.completedCount);
+      const [domainData, myCourses, progress, attempts] = await Promise.all([
+        getDomains(),
+        getMyCourses(),
+        getProgressSummary(),
+        getQuizAttempts(),
+      ]);
 
-      // 3. Load Real Gamification Streak from Backend
-      const profile = await getMyProfile();
-      if (profile) {
-        setStreak(profile.current_streak);
-      }
+      setDomains(domainData);
+      setCourses(myCourses);
+      setCompletedResources(progress.completedCount);
+      setRecentActivity(progress.recent.length);
+      setQuizCount(attempts.length);
     };
+
     load();
   }, []);
 
   return (
-    <div className="space-y-6 pb-10">
-      <section className="rounded-[28px] bg-[linear-gradient(120deg,#111827,#4c1d95,#0f172a)] p-6 lg:p-10 text-white shadow-2xl">
-        <p className="text-sm text-indigo-200">Welcome back</p>
-        <h1 className="text-3xl lg:text-4xl font-black mt-1">{user?.first_name || 'Learner'}, your next chapter is ready.</h1>
-        <p className="text-slate-200 mt-3 max-w-2xl">Fast, focused, and enjoyable study flow with videos, PDF notes, and progress tracking in one place.</p>
-        <div className="grid sm:grid-cols-3 gap-3 mt-6">
-          <StatCard icon={BookOpen} label="Learning Tracks" value={tracks.length} />
-          <StatCard icon={Flame} label="Active Streak" value={`${streak} day${streak === 1 ? '' : 's'}`} />
-          <StatCard icon={Trophy} label="Completed Resources" value={completedCount} />
+    <div className="space-y-6 pb-8">
+      <section className="rounded-3xl bg-[linear-gradient(120deg,#0f172a,#312e81,#0b1120)] p-6 md:p-8 text-white">
+        <p className="text-indigo-100">Hello, {user?.first_name || 'Student'}</p>
+        <h1 className="mt-2 text-2xl md:text-4xl font-black">Your learning control center</h1>
+        <p className="mt-3 max-w-2xl text-indigo-100/90 text-sm md:text-base">Everything is synced with your authorized student account: courses, resources, quizzes, and progress tracking.</p>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat label="Enrolled Courses" value={courses.length} icon={GraduationCap} />
+          <Stat label="Completed Resources" value={completedResources} icon={BookOpenCheck} />
+          <Stat label="Quiz Attempts" value={quizCount} icon={Trophy} />
+          <Stat label="Recent Activity" value={recentActivity} icon={Clock3} />
         </div>
       </section>
 
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <Layers className="w-5 h-5 text-violet-600" />
-          <h2 className="text-xl font-bold text-slate-900">Continue your learning tracks</h2>
+      <section className="grid lg:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 lg:col-span-2">
+          <h2 className="text-xl font-black text-slate-900">Learning tracks</h2>
+          <p className="mt-1 text-sm text-slate-500">Browse all available tracks and continue from where you left off.</p>
+          <div className="mt-4 grid sm:grid-cols-2 gap-3">
+            {domains.slice(0, 6).map((domain) => (
+              <Link key={domain.id} href={`/courses/${domain.id}`} className="rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50/40 transition">
+                <p className="text-sm text-slate-500">{domain.node_type}</p>
+                <p className="font-bold text-slate-900 mt-1">{domain.name}</p>
+                <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-indigo-600">Open <ArrowRight className="w-4 h-4" /></span>
+              </Link>
+            ))}
+          </div>
         </div>
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {tracks.map((track, index) => (
-            <Link key={track.id} href={`/courses/${track.id}`} className="group rounded-3xl border border-slate-200 bg-white p-5 hover:-translate-y-1 hover:shadow-xl transition-all">
-              <div className="h-36 rounded-2xl bg-gradient-to-br from-indigo-100 via-cyan-100 to-fuchsia-100 mb-4 flex items-center justify-center text-4xl font-black text-indigo-500">
-                {String(index + 1).padStart(2, '0')}
-              </div>
-              <h3 className="font-bold text-lg text-slate-900">{track.name}</h3>
-              <p className="text-sm text-slate-500 mt-1">{counts[track.id] ?? 0} subjects curated for this track.</p>
-              <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-violet-600">Start learning <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></span>
-            </Link>
-          ))}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h3 className="font-black text-slate-900">Quick actions</h3>
+          <div className="mt-4 space-y-3">
+            <QuickLink href="/courses" label="Explore Courses" />
+            <QuickLink href="/resources" label="My Saved Resources" />
+            <QuickLink href="/assessments" label="Take an Assessment" />
+            <QuickLink href="/profile" label="Profile & Password" />
+          </div>
+          <div className="mt-6 rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900 flex gap-2">
+            <Flame className="w-4 h-4 mt-0.5" />
+            Keep your streak active by opening at least one resource each day.
+          </div>
         </div>
       </section>
     </div>
   );
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: ComponentType<{ className?: string }>; label: string; value: string | number }) {
+function Stat({ label, value, icon: Icon }: { label: string; value: number; icon: React.ComponentType<{ className?: string }> }) {
   return (
-    <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
-      <Icon className="w-5 h-5 text-cyan-300" />
-      <p className="text-xs text-slate-300 mt-2">{label}</p>
-      <p className="text-2xl font-extrabold">{value}</p>
+    <div className="rounded-2xl border border-white/20 bg-white/10 p-4">
+      <Icon className="w-5 h-5 text-indigo-200" />
+      <p className="text-xs text-indigo-100 mt-2">{label}</p>
+      <p className="text-2xl font-black">{value}</p>
     </div>
+  );
+}
+
+function QuickLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link href={href} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700">
+      {label}
+      <ArrowRight className="w-4 h-4" />
+    </Link>
   );
 }
