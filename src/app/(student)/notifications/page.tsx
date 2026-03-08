@@ -126,7 +126,7 @@ export default function NotificationsPage() {
             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
               <MailOpen className="w-10 h-10 text-slate-300" />
             </div>
-            <p className="text-xl font-bold text-slate-900 mb-2">You're all caught up!</p>
+            <p className="text-xl font-bold text-slate-900 mb-2">You&apos;re all caught up!</p>
             <p className="text-slate-500 font-medium">No new notifications at the moment.</p>
           </div>
         ) : (
