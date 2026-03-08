@@ -8,7 +8,7 @@ import {
   User,
   BookOpen,
   MapPin,
-  Sparkles,
+  UserRoundPlus,
   CheckCircle2,
   ShieldCheck
 } from 'lucide-react';
@@ -62,7 +62,6 @@ export default function AdmissionPage(): JSX.Element {
     setIsSubmitting(true);
 
     try {
-      // Updated payload mapping directly to your new backend schema
       const payload = {
         student_first_name: form.firstName,
         student_last_name: form.lastName,
@@ -79,8 +78,10 @@ export default function AdmissionPage(): JSX.Element {
 
       await studentApi.submitAdmission(payload);
       router.push('/admission/success');
-    } catch (err: any) {
-      console.error('Admission API error', err);
+    } catch (error) {
+      console.error('Admission API error', error);
+      // Type-safe error handling
+      const err = error as { response?: { data?: { detail?: string } } };
       const errorMsg = err?.response?.data?.detail || 'Failed to submit your application. Please check your details and try again.';
 
       await showAlert({
@@ -94,12 +95,18 @@ export default function AdmissionPage(): JSX.Element {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 relative overflow-hidden font-sans text-slate-900">
-      {/* Premium Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-[60vh] bg-gradient-to-b from-indigo-900 via-indigo-800 to-slate-50 pointer-events-none" />
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] pointer-events-none mix-blend-overlay" />
-      <div className="absolute top-[-15%] right-[-5%] w-[400px] md:w-[600px] h-[400px] md:h-[600px] rounded-full bg-violet-500/30 blur-[100px] md:blur-[150px] pointer-events-none" />
-      <div className="absolute top-[20%] left-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] rounded-full bg-cyan-400/20 blur-[100px] md:blur-[120px] pointer-events-none" />
+    <div className="min-h-screen relative font-sans text-slate-900 z-0">
+      
+      {/* FIXED Background Layer - Prevents the scrolling glitch */}
+      <div className="fixed inset-0 -z-10 bg-slate-50">
+        {/* Dark section: Top on mobile, Left half on desktop */}
+        <div className="absolute top-0 left-0 w-full h-[55vh] lg:h-full lg:w-[45%] bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900" />
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] mix-blend-overlay" />
+        
+        {/* Ambient Glows */}
+        <div className="absolute top-[-10%] left-[-5%] w-[400px] md:w-[600px] h-[400px] md:h-[600px] rounded-full bg-violet-500/20 blur-[100px] md:blur-[150px]" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] rounded-full bg-cyan-400/20 blur-[100px] md:blur-[120px]" />
+      </div>
 
       {/* Main Container */}
       <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12 py-12 md:py-20 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-start">
@@ -132,39 +139,23 @@ export default function AdmissionPage(): JSX.Element {
           <div className="w-full bg-white/95 backdrop-blur-3xl rounded-[2rem] border border-white/60 shadow-2xl shadow-indigo-900/10 p-6 sm:p-8 md:p-10 lg:p-12">
             
             <div className="flex items-center gap-2 mb-8 text-indigo-600 bg-indigo-50 w-fit px-4 py-2 rounded-full border border-indigo-100">
-              <Sparkles className="w-4 h-4" />
+              <UserRoundPlus className="w-4 h-4" />
               <span className="text-sm font-bold tracking-wide uppercase">Application Portal</span>
             </div>
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-7">
 
               {/* SECTION: Student Profile */}
-              <div className="md:col-span-2 flex items-center gap-4 border-b border-slate-100 pb-3 mb-1">
-                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200/60">
-                  <User className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800">Student Profile</h2>
-                </div>
-              </div>
-
-              <Field label="First Name" value={form.firstName} onChange={(value: string) => handleChange('firstName', value)} required />
-              <Field label="Last Name" value={form.lastName} onChange={(value: string) => handleChange('lastName', value)} required />
-              <Field label="Email Address" type="email" value={form.email} onChange={(value: string) => handleChange('email', value)} placeholder="student@example.com" required />
-              <Field label="Phone Number" type="tel" value={form.phone} onChange={(value: string) => handleChange('phone', value)} placeholder="+91 98765 43210" required />
+              <SectionHeader icon={<User className="w-5 h-5" />} title="Student Profile" />
+              <Field label="First Name" value={form.firstName} onChange={(val) => handleChange('firstName', val)} required />
+              <Field label="Last Name" value={form.lastName} onChange={(val) => handleChange('lastName', val)} required />
+              <Field label="Email Address" type="email" value={form.email} onChange={(val) => handleChange('email', val)} placeholder="student@example.com" required />
+              <Field label="Phone Number" type="tel" value={form.phone} onChange={(val) => handleChange('phone', val)} placeholder="+91 98765 43210" required />
 
               {/* SECTION: Academic Goals */}
-              <div className="md:col-span-2 flex items-center gap-4 border-b border-slate-100 pb-3 mb-1 mt-4">
-                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200/60">
-                  <BookOpen className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800">Academic Goals</h2>
-                </div>
-              </div>
-
-              <Field label="Current Grade / Class" value={form.grade} onChange={(value: string) => handleChange('grade', value)} placeholder="e.g. 12th Grade" required />
-              <Field label="Target Exam" value={form.targetExam} onChange={(value: string) => handleChange('targetExam', value)} placeholder="e.g. JEE, NEET, Boards" required />
+              <SectionHeader icon={<BookOpen className="w-5 h-5" />} title="Academic Goals" />
+              <Field label="Current Grade / Class" value={form.grade} onChange={(val) => handleChange('grade', val)} placeholder="e.g. 12th Grade" required />
+              <Field label="Target Exam" value={form.targetExam} onChange={(val) => handleChange('targetExam', val)} placeholder="e.g. JEE, NEET, Boards" required />
 
               <label className="md:col-span-2 block group">
                 <span className="block text-sm font-bold text-slate-700 mb-2">Preferred Learning Mode <span className="text-rose-500">*</span></span>
@@ -172,7 +163,7 @@ export default function AdmissionPage(): JSX.Element {
                   <select
                     className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-5 py-3.5 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium text-slate-800 cursor-pointer"
                     value={form.preferredMode}
-                    onChange={(event) => handleChange('preferredMode', event.target.value as AdmissionFormState['preferredMode'])}
+                    onChange={(e) => handleChange('preferredMode', e.target.value as AdmissionFormState['preferredMode'])}
                   >
                     <option value="Online">Online Sessions</option>
                     <option value="Offline">Offline / Classroom</option>
@@ -185,38 +176,24 @@ export default function AdmissionPage(): JSX.Element {
               </label>
 
               {/* SECTION: Contact & Guardian */}
-              <div className="md:col-span-2 flex items-center gap-4 border-b border-slate-100 pb-3 mb-1 mt-4">
-                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200/60">
-                  <MapPin className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800">Contact & Location</h2>
-                </div>
-              </div>
+              <SectionHeader icon={<MapPin className="w-5 h-5" />} title="Contact & Location" />
+              <Field label="Guardian Name" value={form.guardianName} onChange={(val) => handleChange('guardianName', val)} placeholder="Parent/Guardian Name" required />
+              <Field label="Guardian Phone" type="tel" value={form.guardianPhone} onChange={(val) => handleChange('guardianPhone', val)} placeholder="Emergency Contact" required />
 
-              <Field label="Guardian Name" value={form.guardianName} onChange={(value: string) => handleChange('guardianName', value)} placeholder="Parent/Guardian Name" required />
-              <Field label="Guardian Phone" type="tel" value={form.guardianPhone} onChange={(value: string) => handleChange('guardianPhone', value)} placeholder="Emergency Contact" required />
-
-              <label className="md:col-span-2 block">
-                <span className="block text-sm font-bold text-slate-700 mb-2">Full Address <span className="text-rose-500">*</span></span>
-                <textarea
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 min-h-[100px] outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-y font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal"
-                  value={form.address}
-                  onChange={(event) => handleChange('address', event.target.value)}
-                  placeholder="Enter your complete residential address..."
-                  required
-                />
-              </label>
-
-              <label className="md:col-span-2 block">
-                <span className="block text-sm font-bold text-slate-700 mb-2">Additional Notes <span className="text-slate-400 font-normal">(Optional)</span></span>
-                <textarea
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 min-h-[80px] outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-y font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal"
-                  value={form.notes}
-                  onChange={(event) => handleChange('notes', event.target.value)}
-                  placeholder="Learning preferences, specific timing constraints, etc."
-                />
-              </label>
+              <TextAreaField 
+                label="Full Address" 
+                value={form.address} 
+                onChange={(val) => handleChange('address', val)} 
+                placeholder="Enter your complete residential address..." 
+                required 
+              />
+              <TextAreaField 
+                label="Additional Notes" 
+                value={form.notes} 
+                onChange={(val) => handleChange('notes', val)} 
+                placeholder="Learning preferences, specific timing constraints, etc." 
+                required={false}
+              />
 
               {/* Submit Section */}
               <div className="md:col-span-2 mt-4 pt-6">
@@ -262,20 +239,21 @@ function FeatureItem({ title, desc }: { title: string; desc: string }) {
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  placeholder = '',
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  placeholder?: string;
-  required?: boolean;
+function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
+  return (
+    <div className="md:col-span-2 flex items-center gap-4 border-b border-slate-100 pb-3 mb-1 mt-4 first:mt-0">
+      <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200/60">
+        {icon}
+      </div>
+      <div>
+        <h2 className="text-xl font-bold text-slate-800">{title}</h2>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, type = 'text', placeholder = '', required = false }: {
+  label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string; required?: boolean;
 }) {
   return (
     <label className="block group w-full">
@@ -285,10 +263,29 @@ function Field({
       <input
         type={type}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-3.5 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal"
+      />
+    </label>
+  );
+}
+
+function TextAreaField({ label, value, onChange, placeholder = '', required = false }: {
+  label: string; value: string; onChange: (value: string) => void; placeholder?: string; required?: boolean;
+}) {
+  return (
+    <label className="md:col-span-2 block group">
+      <span className="block text-sm font-bold text-slate-700 mb-2">
+        {label} {required ? <span className="text-rose-500">*</span> : <span className="text-slate-400 font-normal">(Optional)</span>}
+      </span>
+      <textarea
+        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 min-h-[100px] outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-y font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
       />
     </label>
   );

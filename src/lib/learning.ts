@@ -10,6 +10,7 @@ export interface SearchNode {
   type: KnowledgeNode['node_type'];
 }
 
+
 function extractList<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[];
   if (typeof data === 'object' && data !== null && 'results' in data && Array.isArray((data as { results?: unknown[] }).results)) {
@@ -17,6 +18,29 @@ function extractList<T>(data: unknown): T[] {
   }
   return [];
 }
+
+
+// ============================================================================
+// 🧠 SMART IN-MEMORY CACHE
+// ============================================================================
+const treeCache = new Map<number, KnowledgeNode>();
+
+function populateCache(node: KnowledgeNode) {
+  if (!node) return;
+  treeCache.set(node.id, node);
+  if (node.children && node.children.length > 0) {
+    node.children.forEach(populateCache);
+  }
+}
+
+
+export function clearLearningCache() {
+  treeCache.clear();
+}
+
+
+// ============================================================================
+
 
 function flattenNodes(nodes: KnowledgeNode[]): KnowledgeNode[] {
   const flat: KnowledgeNode[] = [];
@@ -30,67 +54,58 @@ function flattenNodes(nodes: KnowledgeNode[]): KnowledgeNode[] {
   return flat;
 }
 
-async function getTreeAndFlat() {
-  const { data } = await api.get('/manager/nodes/');
-  const tree = extractList<KnowledgeNode>(data);
-  return { tree, flat: flattenNodes(tree) };
-}
-
-export async function getDomains(): Promise<KnowledgeNode[]> {
+export async function getDomains(forceRefresh = false): Promise<KnowledgeNode[]> {
   try {
-    const { flat } = await getTreeAndFlat();
-    return flat.filter((node) => node.parent === null && node.node_type === 'DOMAIN');
-  } catch {
-    return [];
-  }
-}
+    // Fetch domains with depth to grab the initial structure
+    const { data } = await api.get('/manager/nodes/?depth=10');
+    const nodes = extractList<KnowledgeNode>(data);
+    
+    if (forceRefresh) clearLearningCache();
+    nodes.forEach(populateCache);
 
-export async function getChildren(parentId: number): Promise<KnowledgeNode[]> {
-  try {
-    const { flat } = await getTreeAndFlat();
-    return flat
-      .filter((node) => node.parent === parentId)
+    return nodes
+      .filter((node) => node.parent === null && node.node_type === 'DOMAIN')
       .sort((a, b) => (a.order || 0) - (b.order || 0));
   } catch {
     return [];
   }
 }
 
-export async function getDescendantStudyNodes(subjectId: number): Promise<KnowledgeNode[]> {
-  try {
-    const { flat } = await getTreeAndFlat();
-    const byParent = new Map<number, KnowledgeNode[]>();
-    flat.forEach((node) => {
-      if (node.parent == null) return;
-      const list = byParent.get(node.parent) || [];
-      list.push(node);
-      byParent.set(node.parent, list);
-    });
-
-    const queue = [...(byParent.get(subjectId) || [])];
-    const descendants: KnowledgeNode[] = [];
-    while (queue.length) {
-      const node = queue.shift()!;
-      descendants.push(node);
-      queue.push(...(byParent.get(node.id) || []));
-    }
-
-    const study = descendants.filter((node) => {
-      return (node.resource_count || 0) > 0 || (node.items_count || 0) > 0;
-    });
-    return study.sort((a, b) => (a.order || 0) - (b.order || 0));
-  } catch {
-    return [];
+export async function getNode(nodeId: number, forceRefresh = false): Promise<KnowledgeNode | null> {
+  if (!forceRefresh && treeCache.has(nodeId)) {
+    return treeCache.get(nodeId)!;
   }
-}
 
-export async function getNode(nodeId: number): Promise<KnowledgeNode | null> {
   try {
-    const { flat } = await getTreeAndFlat();
-    return flat.find((node) => node.id === nodeId) || null;
+    // FIX: Add ?depth=10 so hard refreshes pull the entire nested branch
+    const { data } = await api.get(`/manager/nodes/${nodeId}/?depth=10`);
+    const node = data as KnowledgeNode;
+    
+    populateCache(node);
+    return node;
   } catch {
     return null;
   }
+}
+
+export async function getChildren(parentId: number): Promise<KnowledgeNode[]> {
+  const parentNode = await getNode(parentId);
+  if (!parentNode || !parentNode.children) return [];
+
+  return parentNode.children
+    .filter((node) => node.id !== parentId) 
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+
+export async function getDescendantStudyNodes(subjectId: number): Promise<KnowledgeNode[]> {
+  const subjectNode = await getNode(subjectId);
+  if (!subjectNode || !subjectNode.children) return [];
+
+  const descendants = flattenNodes(subjectNode.children);
+
+  return descendants
+    .filter((node) => (node.resource_count || 0) > 0 || (node.items_count || 0) > 0 || node.node_type === 'TOPIC')
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 }
 
 export async function getResources(nodeId: number): Promise<Resource[]> {
@@ -114,14 +129,13 @@ export async function getProgressSummary() {
       completedResourceIds: new Set(completed.map((entry) => entry.resource)),
       completedCount: completed.length,
       streakDays: uniqueDays.size, 
-      recent: completed
-        .sort((a, b) => +new Date(b.last_accessed) - +new Date(a.last_accessed))
-        .slice(0, 5),
+      recent: completed.sort((a, b) => +new Date(b.last_accessed) - +new Date(a.last_accessed)).slice(0, 5),
     };
   } catch {
     return { completedResourceIds: new Set<number>(), completedCount: 0, streakDays: 0, recent: [] as StudentProgress[] };
   }
 }
+
 
 export async function saveResumeTimestamp(resourceId: number, seconds: number) {
   try {
@@ -291,3 +305,4 @@ export async function searchGlobal(query: string): Promise<SearchNode[]> {
 export async function getTracking() {
   return studentApi.getTracking();
 }
+

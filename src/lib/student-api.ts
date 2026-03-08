@@ -52,6 +52,8 @@ export interface BookmarkPayload {
 export interface TrackingPayload {
   id: number;
   resource: number;
+  resource_title?: string;
+  resource_type?: string;
   is_completed: boolean;
   last_accessed: string;
 }
@@ -61,6 +63,7 @@ export interface QuizAnswerInput {
   option_id: number;
 }
 
+// Helper to handle Django REST Framework pagination wrappers
 function extractList<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[];
   if (typeof data === 'object' && data !== null && 'results' in (data as Record<string, unknown>)) {
@@ -70,8 +73,11 @@ function extractList<T>(data: unknown): T[] {
 }
 
 export const studentApi = {
-  submitAdmission: async (payload: AdmissionPayload) => (await api.post('/public/admissions/', payload)).data,
-  changePassword: async (old_password: string, new_password: string) => (await api.put('/public/change-password/', { old_password, new_password })).data,
+  submitAdmission: async (payload: AdmissionPayload): Promise<any> => 
+    (await api.post('/public/admissions/', payload)).data,
+  
+  changePassword: async (old_password: string, new_password: string): Promise<any> => 
+    (await api.put('/public/change-password/', { old_password, new_password })).data,
 
   getMyProfile: async (): Promise<ProfilePayload | null> => {
     try {
@@ -89,26 +95,48 @@ export const studentApi = {
     }
   },
 
-  getCourses: async <T>() => extractList<T>((await api.get('/public/courses/')).data),
-  getMyCourses: async <T>() => extractList<T>((await api.get('/public/courses/my_courses/')).data),
-  enrollInCourse: async (id: number) => (await api.post(`/public/courses/${id}/enroll/`)).data,
+  getCourses: async <T>(): Promise<T[]> => extractList<T>((await api.get('/public/courses/')).data),
+  
+  getMyCourses: async <T>(): Promise<T[]> => extractList<T>((await api.get('/public/courses/my_courses/')).data),
+  
+  enrollInCourse: async (id: number): Promise<any> => 
+    (await api.post(`/public/courses/${id}/enroll/`)).data,
 
-  getQuizById: async <T>(id: number): Promise<T> => (await api.get(`/public/quizzes/${id}/`)).data,
-  submitQuizAttempt: async (quiz_id: number, answers: QuizAnswerInput[]) => (await api.post('/public/quiz-attempts/submit/', { quiz_id, answers })).data,
-  getQuizAttempts: async <T>() => extractList<T>((await api.get('/public/quiz-attempts/')).data),
+  getQuizById: async <T>(id: number): Promise<T> => 
+    (await api.get(`/public/quizzes/${id}/`)).data,
+  
+  submitQuizAttempt: async (quiz_id: number, answers: QuizAnswerInput[]): Promise<any> => 
+    (await api.post('/public/quiz-attempts/submit/', { quiz_id, answers })).data,
+  
+  getQuizAttempts: async <T>(): Promise<T[]> => 
+    extractList<T>((await api.get('/public/quiz-attempts/')).data),
 
-  getNotifications: async (): Promise<NotificationPayload[]> => extractList<NotificationPayload>((await api.get('/public/notifications/')).data),
+  getNotifications: async (): Promise<NotificationPayload[]> => 
+    extractList<NotificationPayload>((await api.get('/public/notifications/')).data),
+  
   getUnreadNotificationCount: async (): Promise<number> => {
     const data = (await api.get('/public/notifications/unread_count/')).data;
     return data?.unread_count || 0;
   },
-  markAllNotificationsRead: async () => (await api.post('/public/notifications/mark_all_read/')).data,
+  
+  markAllNotificationsRead: async (): Promise<any> => 
+    (await api.post('/public/notifications/mark_all_read/')).data,
 
-  getBookmarks: async (): Promise<BookmarkPayload[]> => extractList<BookmarkPayload>((await api.get('/public/bookmarks/')).data),
-  addBookmark: async (resource: number): Promise<BookmarkPayload> => (await api.post('/public/bookmarks/', { resource })).data,
-  removeBookmark: async (id: number) => (await api.delete(`/public/bookmarks/${id}/`)).data,
+  getBookmarks: async (): Promise<BookmarkPayload[]> => 
+    extractList<BookmarkPayload>((await api.get('/public/bookmarks/')).data),
+  
+  addBookmark: async (resource: number): Promise<BookmarkPayload> => 
+    (await api.post('/public/bookmarks/', { resource })).data,
+  
+  removeBookmark: async (id: number): Promise<void> => 
+    (await api.delete(`/public/bookmarks/${id}/`)).data,
 
-  getTracking: async (): Promise<TrackingPayload[]> => extractList<TrackingPayload>((await api.get('/public/tracking/')).data),
-  createTracking: async (resource: number, is_completed = false): Promise<TrackingPayload> => (await api.post('/public/tracking/', { resource, is_completed })).data,
-  updateTracking: async (id: number, payload: Partial<TrackingPayload>): Promise<TrackingPayload> => (await api.put(`/public/tracking/${id}/`, payload)).data,
+  getTracking: async (): Promise<TrackingPayload[]> => 
+    extractList<TrackingPayload>((await api.get('/public/tracking/')).data),
+  
+  createTracking: async (resource: number, is_completed = false): Promise<TrackingPayload> => 
+    (await api.post('/public/tracking/', { resource, is_completed })).data,
+  
+  updateTracking: async (id: number, payload: Partial<TrackingPayload>): Promise<TrackingPayload> => 
+    (await api.put(`/public/tracking/${id}/`, payload)).data,
 };

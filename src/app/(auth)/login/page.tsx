@@ -54,8 +54,8 @@ export default function LoginPage() {
       <div className="hidden lg:flex flex-col justify-between bg-[radial-gradient(circle_at_top,#6366f1,#1d4ed8_45%,#0f172a)] p-10 text-white">
         <div>
           <Logo theme="dark" />
-          <h1 className="mt-10 text-4xl font-black leading-tight">A complete student portal rebuilt for focused learning.</h1>
-          <p className="mt-4 text-indigo-100">Track progress, access resources, take assessments, and stay updated from one responsive dashboard.</p>
+          <h1 className="mt-10 text-4xl font-black leading-tight">A place to excel your studies, with well planned curriculum.</h1>
+          <p className="mt-4 text-indigo-100">Track progress, access resources, take assessments, and stay updated from one impressive dashboard.</p>
         </div>
         <p className="text-sm text-indigo-100/80">Secure access with your registered email address.</p>
       </div>
@@ -68,16 +68,16 @@ export default function LoginPage() {
         <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Sign in</h2>
         <p className="mt-2 text-slate-500">Use your email address as your username.</p>
 
-        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <label className="block space-y-2">
             <span className="text-sm font-semibold text-slate-700">Email</span>
             <div className="relative">
-              <Mail className="w-5 h-5 text-slate-400 absolute left-3 top-3" />
+              <Mail className="w-5 h-5 text-slate-400 absolute left-3 top-3.5" />
               <input
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-11 pr-4 outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal"
                 placeholder="student@example.com"
                 autoComplete="email"
               />
@@ -85,14 +85,19 @@ export default function LoginPage() {
           </label>
 
           <label className="block space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Password</span>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-700">Password</span>
+              <Link href="/forgot-password" className="text-xs font-bold text-indigo-600 hover:text-indigo-500 transition-colors">
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
-              <Lock className="w-5 h-5 text-slate-400 absolute left-3 top-3" />
+              <Lock className="w-5 h-5 text-slate-400 absolute left-3 top-3.5" />
               <input
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-11 pr-4 outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal"
                 placeholder="••••••••"
                 autoComplete="current-password"
               />
@@ -102,7 +107,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-xl bg-slate-900 py-3 font-bold text-white hover:bg-indigo-600 transition flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full rounded-xl bg-slate-900 py-3.5 font-bold text-white hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 disabled:opacity-70 shadow-lg shadow-slate-900/10 hover:shadow-indigo-600/25 active:scale-[0.98]"
           >
             {isSubmitting ? (
               <><Loader2 className="w-5 h-5 animate-spin" />Signing in...</>

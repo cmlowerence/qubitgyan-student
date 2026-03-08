@@ -2,7 +2,17 @@
 
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Resource } from '@/types';
-import { AlertCircle, CheckCircle, ExternalLink, FileText, PlayCircle, Bookmark, BookmarkCheck } from 'lucide-react';
+import { 
+  AlertCircle, 
+  CheckCircle, 
+  ExternalLink, 
+  FileText, 
+  PlayCircle, 
+  Bookmark, 
+  BookmarkCheck,
+  CheckCircle2,
+  LinkIcon
+} from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useUi } from '@/components/providers/ui-provider';
@@ -16,37 +26,53 @@ interface ContentViewerProps {
 }
 
 function getYoutubeId(url: string): string | null {
+  if (!url) return null;
+
   try {
-    const parsed = new URL(url);
-
-    if (parsed.hostname.includes('youtu.be')) {
-      return parsed.pathname.split('/').filter(Boolean)[0] || null;
+    // Method 1: Use native URL parser (The safest and most accurate method)
+    const parsedUrl = new URL(url);
+    
+    if (parsedUrl.hostname.includes('youtu.be')) {
+      return parsedUrl.pathname.slice(1); // Extracts ID from youtu.be/ID
     }
-
-    const v = parsed.searchParams.get('v');
-    if (v) return v;
-
-    const pathMatch = parsed.pathname.match(/\/embed\/([\w-]{11})/);
-    if (pathMatch?.[1]) return pathMatch[1];
-  } catch {
-    return null;
+    
+    if (parsedUrl.hostname.includes('youtube.com')) {
+      if (parsedUrl.pathname === '/watch') {
+        return parsedUrl.searchParams.get('v'); // Extracts ID from watch?v=ID
+      }
+      if (parsedUrl.pathname.startsWith('/embed/')) {
+        return parsedUrl.pathname.split('/')[2]; // Extracts ID from /embed/ID
+      }
+      if (parsedUrl.pathname.startsWith('/shorts/')) {
+        return parsedUrl.pathname.split('/')[2]; // Extracts ID from /shorts/ID
+      }
+    }
+  } catch (err) {
+    // Ignore URL parse errors and fall through to regex
   }
 
-  return null;
+  // Method 2: Regex fallback just in case
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|\/shorts\/)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
 }
 
 function toEmbedUrl(resource: Resource): string | null {
-  if (resource.preview_link) return resource.preview_link;
-  if (!resource.external_url) return null;
+  const targetUrl = resource.external_url || resource.preview_link;
+  if (!targetUrl) return null;
 
-  const youtubeId = getYoutubeId(resource.external_url);
-  if (youtubeId) return `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&modestbranding=1`;
-
-  if (resource.resource_type === 'PDF' && resource.external_url.endsWith('.pdf')) {
-    return `${resource.external_url}#toolbar=0&view=FitH`;
+  const youtubeId = getYoutubeId(targetUrl);
+  
+  if (youtubeId) {
+    // Pure, clean embed URL without extra params that sometimes cause black boxes
+    return `https://www.youtube.com/embed/${youtubeId}`;
   }
 
-  return resource.external_url;
+  if (resource.resource_type === 'PDF' && /\.pdf(\?.*)?$/i.test(targetUrl)) {
+    return `${targetUrl}#toolbar=0&view=FitH`;
+  }
+
+  return targetUrl;
 }
 
 function isPlayableVideo(url?: string) {
@@ -90,7 +116,8 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
       }
     };
     checkBookmark();
-    // If there is a saved resume timestamp locally, attempt to restore for HTML5 videos
+
+    // Restore video resume state locally
     try {
       if (resource && resource.resource_type === 'VIDEO') {
         const key = `resume_${resource.id}`;
@@ -193,7 +220,6 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
       setIsCompleted(true);
       onComplete?.();
 
-      // clear client-side resume and inform server that resume is reset
       try {
         localStorage.removeItem(`resume_${resource.id}`);
         await saveResumeTimestamp(resource.id, 0);
@@ -217,7 +243,17 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
     }
   };
 
-  if (!resource) return <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">Choose a resource to start learning.</div>;
+  if (!resource) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center p-10">
+        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4 border border-slate-200">
+          <PlayCircle className="w-8 h-8 text-slate-300" />
+        </div>
+        <p className="text-xl font-bold text-slate-900 mb-1">Select a Lesson</p>
+        <p className="text-sm font-medium text-slate-500">Choose a resource from the index to start learning.</p>
+      </div>
+    );
+  }
 
   const normalizedType = resource.resource_type?.toUpperCase();
   const isPdf = normalizedType === 'PDF';
@@ -225,103 +261,136 @@ export function ContentViewer({ resource, nodeId, onComplete }: ContentViewerPro
   const isQuiz = normalizedType === 'QUIZ';
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className="flex flex-col h-full bg-white">
+      {/* Top Title Bar */}
+      <div className="p-5 sm:p-6 lg:px-8 border-b border-slate-100 flex flex-col sm:flex-row sm:items-start justify-between gap-4 bg-slate-50/50">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{resource.resource_type}</p>
-          <h2 className="text-xl lg:text-2xl font-black text-slate-900">{resource.title}</h2>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] uppercase font-black tracking-widest text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
+              {resource.resource_type}
+            </span>
+            {isCompleted && (
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase font-black tracking-widest text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-md">
+                <CheckCircle2 className="w-3 h-3" /> Completed
+              </span>
+            )}
+          </div>
+          <h2 className="text-2xl font-black text-slate-900 leading-tight">{resource.title}</h2>
         </div>
-        {isCompleted && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-bold">
-            <CheckCircle className="w-3 h-3" />Completed
-          </span>
-        )}
       </div>
 
-      {isVideo && embedUrl ? (
-        <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-black">
-          {iframeError ? (
-            <div className="bg-slate-950 text-slate-100 p-5 sm:p-7 space-y-3">
-              <p className="inline-flex items-center gap-2 text-sm font-semibold text-amber-300">
-                <AlertCircle className="w-4 h-4" />Embedded player unavailable
-              </p>
-              <p className="text-sm text-slate-300">This source blocks in-app playback on some browsers. You can still open and watch it in a new tab.</p>
-              {resource.external_url && (
-                <a href={resource.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-white text-slate-900 px-4 py-2 text-sm font-semibold">
-                  Open video directly <ExternalLink className="w-4 h-4" />
-                </a>
+      {/* Main Content Area */}
+      <div className="flex-1 p-4 sm:p-6 lg:px-8 bg-slate-50">
+        <div className="max-w-4xl mx-auto w-full">
+          
+          {isVideo && embedUrl ? (
+            <div className="rounded-[1.5rem] overflow-hidden border border-slate-200 shadow-xl shadow-slate-900/5 bg-slate-900">
+              {iframeError ? (
+                <div className="bg-slate-950 text-slate-100 p-8 text-center space-y-4 min-h-[300px] flex flex-col items-center justify-center">
+                  <AlertCircle className="w-10 h-10 text-amber-400 mb-2" />
+                  <p className="font-bold text-lg">Embedded player unavailable</p>
+                  <p className="text-sm text-slate-400 max-w-md">This video provider restricts in-app playback. You can securely watch it by opening the original link.</p>
+                  {resource.external_url && (
+                    <a href={resource.external_url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white text-slate-900 px-6 py-3 text-sm font-bold hover:bg-slate-100 transition-colors">
+                      Watch on YouTube <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              ) : isPlayableVideo(embedUrl) ? (
+                <video ref={videoRef} controls playsInline className="w-full aspect-video bg-black rounded-[1.5rem]">
+                  <source src={embedUrl} />
+                  Your browser does not support the video tag.
+                </video>
+              ) : (
+                <div className="w-full aspect-video relative">
+                  <iframe
+                    src={embedUrl}
+                    title={resource.title}
+                    className="absolute inset-0 w-full h-full rounded-[1.5rem]"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                </div>
               )}
             </div>
-          ) : isPlayableVideo(embedUrl) ? (
-            <video ref={videoRef} controls playsInline className="w-full max-h-[72vh] bg-black">
-              <source src={embedUrl} />
-              Your browser does not support the video tag.
-            </video>
-          ) : (
-            <div className="space-y-2">
-              <p className="px-3 pt-3 text-xs text-slate-300">If the player does not load, use &quot;Open original&quot; below.</p>
-              <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
-              <iframe
-                src={embedUrl}
-                title={resource.title}
-                className="absolute inset-0 w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                referrerPolicy="strict-origin-when-cross-origin"
-                onError={() => setIframeError(true)}
-                onLoad={() => setIframeError(false)}
-                allowFullScreen
-              />
-              </div>
+          ) : null}
+
+          {isPdf && embedUrl ? (
+            <div className="rounded-[1.5rem] overflow-hidden border border-slate-200 shadow-md bg-white">
+              <iframe src={embedUrl} title={resource.title} className="w-full h-[75vh] min-h-[500px]" />
+            </div>
+          ) : null}
+
+          {isQuiz && (
+            <div className="bg-white rounded-[1.5rem] border border-slate-200 shadow-sm overflow-hidden">
+              <QuizViewer resource={resource} onComplete={onComplete} />
             </div>
           )}
-        </div>
-      ) : null}
 
-      {isPdf && embedUrl ? (
-        <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
-          <iframe src={embedUrl} title={resource.title} className="w-full h-[75vh] min-h-[460px]" />
-        </div>
-      ) : null}
-
-      {isQuiz && <QuizViewer resource={resource} onComplete={onComplete} />}
-
-      {!isVideo && !isPdf && resource.content_text && <article className="rounded-2xl border border-slate-200 bg-slate-50 p-5 leading-relaxed text-slate-700">{resource.content_text}</article>}
-
-      {resource.external_url && !resource.content_text && !isVideo && !isPdf && (
-        <a href={resource.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-3 font-semibold">
-          Open resource <ExternalLink className="w-4 h-4" />
-        </a>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        {!isQuiz && (
-          <button
-            onClick={handleMarkComplete}
-            disabled={isCompleting || isCompleted}
-            className={cn('inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all', isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-900 text-white hover:bg-slate-800')}
-          >
-            <CheckCircle className="w-4 h-4" />
-            {isCompleting ? 'Saving...' : isCompleted ? 'Completed' : 'Mark as complete'}
-          </button>
-        )}
-
-        {/* --- THE NEW BOOKMARK BUTTON --- */}
-        <button
-          onClick={handleToggleBookmark}
-          disabled={isBookmarking}
-          className={cn('inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all border', 
-            isBookmarked 
-              ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' 
-              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+          {!isVideo && !isPdf && !isQuiz && resource.content_text && (
+            <article className="rounded-[1.5rem] border border-slate-200 bg-white p-8 prose prose-slate max-w-none shadow-sm">
+              {resource.content_text}
+            </article>
           )}
-        >
-          {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-          {isBookmarked ? 'Saved to Bookmarks' : 'Save for later'}
-        </button>
+
+          {resource.external_url && !resource.content_text && !isVideo && !isPdf && !isQuiz && (
+            <div className="text-center py-12 bg-white rounded-[1.5rem] border border-slate-200 shadow-sm">
+              <LinkIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-slate-900 mb-2">External Link</h3>
+              <p className="text-slate-500 font-medium mb-6">This resource points to an external website or file.</p>
+              <a href={resource.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-6 py-3 font-bold hover:bg-indigo-600 transition-colors shadow-lg active:scale-95">
+                Open Resource <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* Bottom Action Bar */}
+      <div className="p-4 sm:p-6 border-t border-slate-100 bg-white flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {!isQuiz && (
+            <button
+              onClick={handleMarkComplete}
+              disabled={isCompleting || isCompleted}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all', 
+                isCompleted 
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                  : 'bg-slate-900 text-white hover:bg-indigo-600 shadow-md active:scale-95'
+              )}
+            >
+              <CheckCircle className="w-4 h-4" />
+              {isCompleting ? 'Saving...' : isCompleted ? 'Completed' : 'Mark as Complete'}
+            </button>
+          )}
+
+          <button
+            onClick={handleToggleBookmark}
+            disabled={isBookmarking}
+            className={cn(
+              'inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all border active:scale-95', 
+              isBookmarked 
+                ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' 
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+            )}
+          >
+            {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+            {isBookmarked ? 'Saved' : 'Save for Later'}
+          </button>
+        </div>
 
         {resource.external_url && !isQuiz && (
-          <a href={resource.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50">
-            {resource.resource_type === 'VIDEO' ? <PlayCircle className="w-4 h-4" /> : <FileText className="w-4 h-4" />} Open original
+          <a 
+            href={resource.external_url} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 bg-white hover:bg-slate-50 hover:text-slate-900 transition-colors"
+          >
+            {resource.resource_type === 'VIDEO' ? <PlayCircle className="w-4 h-4" /> : <FileText className="w-4 h-4" />} 
+            Open Original <ExternalLink className="w-4 h-4" />
           </a>
         )}
       </div>
